@@ -1,21 +1,68 @@
 library(shiny)
-library(bslib)
 
-# Define UI for app that draws a histogram ----
-ui <- page_sidebar(
+# Define UI for data upload app ----
+ui <- fluidPage(
+
+  theme = shinythemes::shinytheme("sandstone"),
+
   # App title ----
-  title = "Hello Shiny!",
-  # Sidebar panel for inputs ----
-  sidebar = sidebar(
-    # Input: Slider for the number of bins ----
-    sliderInput(
-      inputId = "bins",
-      label = "Number of bins:",
-      min = 1,
-      max = 50,
-      value = 30
-    )
+  titlePanel("Clustering Variables in R"),
+
+  # Sidebar layout with input and output definitions ----
+  sidebarLayout(
+    # Sidebar panel for inputs ----
+    sidebarPanel(
+
+      # Input: Select a file ----
+      fileInput("file1", "Choose CSV File",
+                multiple = FALSE,
+                accept = c("text/csv",
+                           "text/comma-separated-values,text/plain",
+                           ".csv")),
+      # Horizontal line ----
+      tags$hr(style = "border: 1px solid black;"),
+
+      # Input: Checkbox if file has header ----
+      checkboxInput("header", "Header", TRUE),
+
+      # Input: Select separator ----
+      radioButtons("sep", "Separator",
+                   choices = c(Comma = ",",
+                               Semicolon = ";",
+                               Tab = "\t"),
+                   selected = ","),
+
+      # Horizontal line ----
+      tags$hr(style = "border: 1px solid black;"),
+
+      # ---- Variable selectors (always visible) ----
+      selectInput("active_vars", "Choose Active Variables",
+                  choices = NULL,
+                  multiple = TRUE),
+
+      selectInput("illustrative_vars", "Choose Illustrative Variables",
+                  choices = NULL,
+                  multiple = TRUE),
+
+
+      # Input: Choose clustering algorithm ----
+      radioButtons(
+        inputId = "algorithm",
+        label = "Choose a clustering model:",
+        choices = c(
+          "Hierarchical (hclustvar)" = "hclustvar",
+          "K-means (kmeansvar)" = "kmeansvar",
+          "MCA-based" = "mca"
+        ),
+        selected = "hclustvar"
+      )
+
   ),
-  # Output: Histogram ----
-  plotOutput(outputId = "distPlot")
+  # Main panel for displaying outputs----
+  mainPanel(
+    h4("Preview of Uploaded Data"),
+    tableOutput("contents")
+
+    )
+  )
 )

@@ -1,23 +1,52 @@
-# Define server logic required to draw a histogram ----
-server <- function(input, output) {
+server <- function(input, output, session) {
 
-  # Histogram of the Old Faithful Geyser Data ----
-  # with requested number of bins
-  # This expression that generates a histogram is wrapped in a call
-  # to renderPlot to indicate that:
-  #
-  # 1. It is "reactive" and therefore should be automatically
-  #    re-executed when inputs (input$bins) change
-  # 2. Its output type is a plot
-  output$distPlot <- renderPlot({
+  data_uploaded <- reactive({
+    req(input$file1)
 
-    x    <- faithful$waiting
-    bins <- seq(min(x), max(x), length.out = input$bins + 1)
-
-    hist(x, breaks = bins, col = "#007bc2", border = "white",
-         xlab = "Waiting time to next eruption (in mins)",
-         main = "Histogram of waiting times")
-
+    tryCatch(
+      {
+        df <- read.csv(input$file1$datapath,
+                       header = input$header,
+                       sep = input$sep)
+        df
+      },
+      error = function(e) {
+        stop(safeError(e))
+      }
+    )
   })
 
+  # ---- Display only the first few rows ----
+  output$contents <- renderTable({
+    head(data_uploaded())
+  })
+
+  # ---- Update variable selector choices when data is loaded ----
+  observeEvent(data_uploaded(), {
+    df <- data_uploaded()
+    cols <- names(df)
+
+    updateSelectInput(session, "active_vars", choices = cols)
+    updateSelectInput(session, "illustrative_vars", choices = cols)
+  })
+
+  # ---- Keep variable lists mutually exclusive ----
+  observeEvent(input$active_vars, {
+    if (!is.null(input$file1)) {
+      updateSelectInput(session, "illustrative_vars",
+                        choices = setdiff(names(data_uploaded()), input$active_vars),
+                        selected = intersect(input$illustrative_vars,
+                                             setdiff(names(data_uploaded()), input$active_vars)))
+    }
+  })
+
+  observeEvent(input$illustrative_vars, {
+    if (!is.null(input$file1)) {
+      updateSelectInput(session, "active_vars",
+                        choices = setdiff(names(data_uploaded()), input$illustrative_vars),
+                        selected = intersect(input$active_vars,
+                                             setdiff(names(data_uploaded()), input$illustrative_vars)))
+    }
+  })
 }
+
