@@ -1,4 +1,5 @@
 library(shiny)
+library(bslib)
 
 # Define UI for data upload app ----
 ui <- fluidPage(
@@ -6,21 +7,19 @@ ui <- fluidPage(
   theme = shinythemes::shinytheme("sandstone"),
 
   # App title ----
-  titlePanel("Clustering Variables in R"),
+  titlePanel("ClusteringVariables"),
 
-  # Sidebar layout with input and output definitions ----
+  # Sidebar layout ----
   sidebarLayout(
     # Sidebar panel for inputs ----
     sidebarPanel(
-
+      width = 3,
       # Input: Select a file ----
       fileInput("file1", "Choose CSV File",
                 multiple = FALSE,
                 accept = c("text/csv",
                            "text/comma-separated-values,text/plain",
                            ".csv")),
-      # Horizontal line ----
-      tags$hr(style = "border: 1px solid black;"),
 
       # Input: Checkbox if file has header ----
       checkboxInput("header", "Header", TRUE),
@@ -31,9 +30,6 @@ ui <- fluidPage(
                                Semicolon = ";",
                                Tab = "\t"),
                    selected = ","),
-
-      # Horizontal line ----
-      tags$hr(style = "border: 1px solid black;"),
 
       # ---- Variable selectors (always visible) ----
       selectInput("active_vars", "Choose Active Variables",
@@ -50,19 +46,20 @@ ui <- fluidPage(
         inputId = "algorithm",
         label = "Choose a clustering model:",
         choices = c(
-          "Hierarchical (hclustvar)" = "hclustvar",
-          "K-means (kmeansvar)" = "kmeansvar",
-          "MCA-based" = "mca"
+          "K-means (Mixed)" = "kmeans",
+          "VarClus (Quantitative)" = "varclus",
+          "MCA&CAH (Qualitative" = "acm_cah"
         ),
-        selected = "hclustvar"
-      )
+        selected = "kmeans"
+      ),
+
+      actionButton("run_clustering", "Run Clustering")
 
   ),
+
   # Main panel for displaying outputs----
   mainPanel(
-    h4("Preview of Uploaded Data"),
-    tableOutput("contents")
-
-    )
+    uiOutput("main_content")
+   )
   )
 )
