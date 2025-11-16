@@ -1,65 +1,102 @@
 varclus_ui <- function() {
   tagList(
-    h3("VarClus Clustering Results"),
+    # ===== Title =====
+    div(
+      h2("Clustering numeric variables using VarClus Method"),
+      style = "
+        text-align: center;
+        margin: 30px 0 40px 0;
+        font-weight: 700;
+        font-size: 28px;
+        color: #2c3e50;"
+    ),
 
-    # ===== First row: Print + Elbow =====
-    fluidRow(
-      column(
-        width = 4,
-        div(style = "padding:15px; border-radius:8px;
-                    box-shadow:0 2px 5px rgba(0,0,0,0.1); height:300px; overflow-y:auto;",
-            h4("Cluster Print"),
-            verbatimTextOutput("varclus_print")
-        )
+    # ===== First row: Model Overview + Elbow Plot (40/60) =====
+    div(
+      style = "display: flex; gap: 20px; flex-wrap: nowrap; margin-bottom: 30px;",
+
+      # Model Overview
+      div(
+        style = "
+          flex: 0 0 40%;
+          padding: 20px;
+          border-radius: 10px;
+          background: #ffffff;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+          overflow: visible;",
+        h4("VarClus model overview", style = "margin-bottom: 15px; color:#34495e; font-weight: bold;"),
+        tags$head(
+          tags$style(HTML("
+            #varclus_print {
+              background-color: white !important;
+              color: black !important;
+              font-family: Arial, sans-serif !important;
+              font-size: 14px !important;
+              padding: 10px !important;
+              border: none !important;
+              height: auto !important;
+              overflow-y: visible !important;
+            }
+          "))
+        ),
+        verbatimTextOutput("varclus_print")
       ),
-      column(
-        width = 8,
-        div(style = "padding:15px; border-radius:8px;
-                    box-shadow:0 2px 5px rgba(0,0,0,0.1);",
-            h4("Elbow Method"),
-            plotOutput("varclus_elbow")
-        )
+
+      # Elbow Plot
+      div(
+        style = "
+          flex: 0 0 60%;
+          padding: 20px;
+          border-radius: 10px;
+          background: #ffffff;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.05);",
+        h4("Elbow Method Plot - Optimal k Suggested", style = "margin-bottom: 15px; color:#34495e; font-weight: bold;"),
+        plotOutput("varclus_elbow", height = "300px")
       )
     ),
 
-    tags$br(),
+    # ===== Second row: Heatmap + Dendrogram  =====
+    div(
+      style = "display: flex; gap: 20px; flex-wrap: nowrap; margin-bottom: 30px;",
 
-    # ===== Second row: Heatmap + Dendrogram =====
-    fluidRow(
-      column(
-        width = 7,
-        div(style = "padding:15px; border-radius:8px;
-                    box-shadow:0 2px 5px rgba(0,0,0,0.1);",
-            h4("Heatmap"),
-            plotOutput("varclus_heatmap")
-        )
+      div(
+        style = "
+          flex: 0 0 50%;
+          padding: 10px;
+          border-radius: 10px;
+          background: #ffffff;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.05);",
+        h4("Heatmap - Variables Correlation", style = "margin-bottom: 15px; color:#34495e; font-weight: bold;"),
+        plotlyOutput("varclus_heatmap", height = "400px")
       ),
-      column(
-        width = 5,
-        div(style = "padding:15px; border-radius:8px;
-                    box-shadow:0 2px 5px rgba(0,0,0,0.1);",
-            h4("Dendrogram"),
-            plotOutput("varclus_dendrogram")
-        )
+
+      div(
+        style = "
+          flex: 0 0 50%;
+          padding: 10px;
+          border-radius: 10px;
+          background: #ffffff;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.05);",
+        h4("Dendrogram - Colored Clusters", style = "margin-bottom: 15px; color:#34495e; font-weight: bold;"),
+        plotOutput("varclus_dendrogram", height = "400px")
       )
     ),
-
-    tags$br(),
 
     # ===== Third row: Cluster Summary =====
-    fluidRow(
-      column(
-        width = 12,
-        div(style = "padding:15px; border-radius:8px;
-                    box-shadow:0 2px 5px rgba(0,0,0,0.1);",
-            h4("Cluster Summary"),
-            verbatimTextOutput("varclus_summary_text"),
-            tableOutput("varclus_cluster_summary"),
-            tableOutput("varclus_R2_summary")
-        )
-      )
+    div(
+      style = "
+        padding: 20px;
+        border-radius: 10px;
+        background: #ffffff;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        margin-bottom: 40px;",
+      h4("VarClus Model - Clusters Summary", style = "margin-bottom: 15px; color:#34495e; font-weight: bold;"),
+      verbatimTextOutput("varclus_summary_text"),
+      tableOutput("varclus_cluster_summary"),
+      tableOutput("varclus_R2_summary")
     )
   )
 }
+
 
 

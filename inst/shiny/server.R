@@ -5,6 +5,7 @@ source("varclus_ui.R")
 source("../../R/varclus.R")
 
 library(shinyjs)
+library(plotly)
 
 server <- function(input, output, session) {
 
@@ -274,7 +275,7 @@ server <- function(input, output, session) {
   })
 
   # heatmap
-  output$varclus_heatmap <- renderPlot({
+  output$varclus_heatmap <- renderPlotly({
     req(clustering_engine())
     heat_fun <- clustering_engine()$model$get_heatmap()
     heat_fun()

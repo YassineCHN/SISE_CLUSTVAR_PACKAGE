@@ -1,6 +1,7 @@
 library(R6)
 library(Hmisc)
 library(dendextend)
+library(plotly)
 
 VarClus <- R6::R6Class(
   "VarClus",
@@ -71,7 +72,7 @@ VarClus <- R6::R6Class(
 
       # Return a function that plots it when called
       function() {
-        plot(dend, horiz = FALSE, main = "Dendrogram of Variables", xlab = "Height")
+        plot(dend, horiz = FALSE, main = NULL, xlab = NULL)
       }
     },
 
@@ -82,12 +83,19 @@ VarClus <- R6::R6Class(
       cor_mat <- self$model$sim  # correlation matrix from varclus
 
       function() {
-        heatmap(cor_mat,
-                Rowv = NA,  # no reordering
-                Colv = NA,
-                col = colorRampPalette(c("blue","white","red"))(50),
-                scale = "none",
-                main = "Variable Correlation Heatmap")
+        plot_ly(
+          x = colnames(cor_mat),
+          y = rownames(cor_mat),
+          z = cor_mat,
+          type = "heatmap",
+          colorscale = "Oranges",
+          zmin = min(cor_mat),
+          zmax = max(cor_mat)
+        ) %>%
+          layout(
+            xaxis = list(title = ""),
+            yaxis = list(title = "", autorange = "reversed")
+          )
       }
     },
 
@@ -113,7 +121,7 @@ VarClus <- R6::R6Class(
       cluster_results <- private$compute_cluster_pcs()
       cluster_details <- private$compute_cluster_R2()
 
-      text_summary <- paste("VarClusR Summary\n",
+      text_summary <- paste("VarClus Summary\n",
                             "Similarity measure:", self$similarity, "\n",
                             "Number of clusters:", self$n_clusters)
 
@@ -163,23 +171,26 @@ VarClus <- R6::R6Class(
       for (k in names(cluster_pcs)) {
         vars_in_cluster <- self$clusters$variable[self$clusters$cluster == as.numeric(k)]
         n_vars <- length(vars_in_cluster)
-        pc1 <- cluster_pcs[[k]]
 
         if (n_vars == 1) {
-          eigenvalue <- 1
-          variance_explained <- 100
+          eigenvalue <- 1.0000
+          prop_explained <- 1.0000
         } else {
-          # Variance explained by first PC
-          eigenvalue <- var(pc1) * (nrow(self$data) - 1)
-          variance_explained <- (eigenvalue / n_vars) * 100
+          # Compute eigenvalue using PCA
+          mat <- scale(self$data[, vars_in_cluster, drop = FALSE])
+          pca <- prcomp(mat, center = TRUE, scale. = TRUE)
+          eigenvalue <- round(pca$sdev[1]^2, 3)
+          prop_explained <- round(pca$sdev[1]^2 / sum(pca$sdev^2), 4)
         }
 
         cluster_results <- rbind(cluster_results,
-                                 data.frame(cluster = as.numeric(k),
-                                            n_variables = n_vars,
-                                            eigenvalue = eigenvalue,
-                                            variance_explained = variance_explained))
+                                 data.frame(cluster = as.integer(k),
+                                            `nbr_Members` = n_vars,
+                                            Variation_explained = formatC(eigenvalue, format="f", digits=3),
+                                            Proportion_explained = formatC(prop_explained, format="f", digits=3)))
       }
+
+      cluster_results <- rbind(cluster_results)
 
       return(cluster_results)
     },
@@ -195,11 +206,11 @@ VarClus <- R6::R6Class(
       cluster_pcs <- private$compute_cluster_pcs_list()
 
       cluster_details <- data.frame(
-        cluster = integer(),
-        variable = character(),
-        R2_own_pct = numeric(),
-        R2_next_pct = numeric(),
-        unexplained_pct = numeric(),
+        Cluster = integer(),
+        Member = character(),
+        Own_Cluster = numeric(),
+        Next_Cluster = numeric(),
+        `1-R2_Ratio` = numeric(),
         stringsAsFactors = FALSE
       )
 
@@ -218,13 +229,16 @@ VarClus <- R6::R6Class(
           0
         }
 
+        R2_all <- sapply(cluster_pcs, function(pc) cor(self$data[, var], pc)^2)
+        R2_ratio <- if(length(R2_all) == 1) 0 else (1 - R2_own) / (1 - R2_next)
+
         cluster_details <- rbind(cluster_details,
                                  data.frame(
-                                   cluster = clust,
-                                   variable = var,
-                                   R2_own_pct = R2_own * 100,
-                                   R2_next_pct = R2_next * 100,
-                                   unexplained_pct = (1 - R2_own) * 100
+                                   Cluster = clust,
+                                   Member = var,
+                                   Own_Cluster = formatC(R2_own, format="f", digits=3),
+                                   Next_Cluster = formatC(R2_next, format="f", digits=3),
+                                   `1_R2_Ratio` = formatC(R2_ratio, format="f", digits=3)
                                  ))
       }
 

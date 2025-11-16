@@ -55,8 +55,9 @@ varclus_elbow <- function(X_num, similarity = "spearman") {
   # Store plot function in a separate object (closure)
   plot_elbow <- function() {
     plot(k_vals, y, type = "b", pch = 19, col = "blue",
-         xlab = "Number of clusters", ylab = "Average intra-cluster similarity",
-         main = "VarClus Elbow Method")
+         xlab = "Number of clusters", ylab = "intra-cluster similarity", xaxt = "n",
+         main = NULL )
+    axis(1, at = k_vals, labels = k_vals)
     points(optimal_k, y[which.max(distances)], col = "red", pch = 19, cex = 1.5)
     text(optimal_k, y[which.max(distances)], labels = paste("K =", optimal_k), pos = 3, col = "red")
   }
