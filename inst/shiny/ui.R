@@ -1,72 +1,82 @@
 library(shiny)
 library(bslib)
 
-# Define UI for data upload app ----
+# =========================
+# Define UI for ClusteringVariables App
+# =========================
 ui <- fluidPage(
 
+  # ---- Theme & JS ----
   theme = shinythemes::shinytheme("united"),
   shinyjs::useShinyjs(),
 
-  # App title ----
+  # ---- App Title ----
   titlePanel("ClusteringVariables"),
 
-  # Sidebar layout ----
+  # ---- Sidebar Layout ----
   sidebarLayout(
-    # Sidebar panel for inputs ----
+
+    # =========================
+    # Sidebar Panel: Inputs
+    # =========================
     sidebarPanel(
       width = 3,
-      # Input: Select a file ----
-      fileInput("file1", "Choose CSV File",
-                multiple = FALSE,
-                accept = c("text/csv",
-                           "text/comma-separated-values,text/plain",
-                           ".csv")),
 
-      # Input: Checkbox if file has header ----
+      # ---- File Upload ----
+      fileInput(
+        "file1",
+        "Choose CSV File",
+        multiple = FALSE,
+        accept = c("text/csv", "text/comma-separated-values,text/plain", ".csv")
+      ),
+
+      # ---- Header Option ----
       checkboxInput("header", "Header", TRUE),
 
-      # Input: Select separator ----
-      radioButtons("sep", "Separator",
-                   choices = c(Comma = ",",
-                               Semicolon = ";",
-                               Tab = "\t"),
-                   selected = ","),
+      # ---- Separator Option ----
+      radioButtons(
+        "sep",
+        "Separator",
+        choices = c(Comma = ",", Semicolon = ";", Tab = "\t"),
+        selected = ","
+      ),
 
-      # ---- Variable selectors (always visible) ----
-      selectInput("active_vars", "Choose Active Variables",
-                  choices = NULL,
-                  multiple = TRUE),
+      # ---- Variable Selectors ----
+      selectInput(
+        "active_vars",
+        "Choose Active Variables",
+        choices = NULL,
+        multiple = TRUE
+      ),
+      selectInput(
+        "illustrative_vars",
+        "Choose Illustrative Variables",
+        choices = NULL,
+        multiple = TRUE
+      ),
 
-      selectInput("illustrative_vars", "Choose Illustrative Variables",
-                  choices = NULL,
-                  multiple = TRUE),
-
-
-      # Input: Choose clustering algorithm ----
+      # ---- Clustering Algorithm ----
       radioButtons(
         inputId = "algorithm",
         label = "Choose a clustering model:",
-        choices = c(
-          "KMeans" = "kmeans",
-          "VarClus" = "varclus",
-          "MCA&CAH" = "acm_cah"
-        ),
+        choices = c("KMeans" = "kmeans",
+                    "VarClus" = "varclus",
+                    "MCA&CAH" = "acm_cah"),
         selected = "kmeans"
       ),
 
+      # ---- Number of Clusters ----
       tags$div(
         tags$strong("Choose number of clusters (k):"),
         style = "margin-bottom: 2px;"
       ),
 
-      # --- Auto K checkbox ---
       checkboxInput(
         inputId = "auto_k",
         label = "auto",
         value = TRUE
       ),
 
-      # --- Manual number of clusters slider ---
       sliderInput(
         inputId = "num_k",
         label = NULL,
@@ -76,13 +86,15 @@ ui <- fluidPage(
         step = 1
       ),
 
+      # ---- Run Button ----
       actionButton("run_clustering", "Run Clustering")
+    ),
 
-  ),
-
-  # Main panel for displaying outputs----
-  mainPanel(
-    uiOutput("main_content")
-   )
+    # =========================
+    # Main Panel: Outputs
+    # =========================
+    mainPanel(
+      uiOutput("main_content")
+    )
   )
 )

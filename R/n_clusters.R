@@ -1,21 +1,35 @@
+#' Determine optimal number of clusters K using the elbow method
+#'
+#' Computes intra-cluster similarity for k = 2:(n-1) and finds the elbow point.
+#' Returns both the optimal k and a plotting function.
+#'
+#' @param X_num Numeric matrix or data frame of variables.
+#' @param similarity Character string for correlation method ("pearson", "spearman", etc.)
+#' @return A list with `optimal_k` (integer) and `plot` (function to draw elbow plot)
+#' @export
+varclus_elbow <- function(X_num, similarity = "pearson") {
 
-# Determine optimal number of clusters K using elbow method
-varclus_elbow <- function(X_num, similarity = "spearman") {
-
-  # Expect numeric matrix
+  # ----------------------------
+  # Input validation
+  # ----------------------------
   if (!is.matrix(X_num) && !all(sapply(X_num, is.numeric))) {
     stop("Input to varclus_elbow() must be numeric.")
   }
 
   if (ncol(X_num) < 2) stop("Need at least 2 numeric variables.")
 
+  # ----------------------------
   # Run varclus
+  # ----------------------------
   vc <- Hmisc::varclus(x = X_num, similarity = similarity)
   hc <- vc$hclust
   max_k <- ncol(X_num) - 1
 
-  # Compute average intra-cluster inertia
+  # ----------------------------
+  # Compute average intra-cluster similarity
+  # ----------------------------
   avg_inertia <- numeric(max_k)
+
   for (k in 2:max_k) {
     clust <- cutree(hc, k = k)
     cluster_sim <- numeric(k)
@@ -29,10 +43,13 @@ varclus_elbow <- function(X_num, similarity = "spearman") {
         cluster_sim[i] <- 1
       }
     }
+
     avg_inertia[k] <- mean(cluster_sim)
   }
 
-  # True elbow detection
+  # ----------------------------
+  # Detect true elbow
+  # ----------------------------
   k_vals <- 2:max_k
   y <- avg_inertia[2:max_k]
 
@@ -43,7 +60,7 @@ varclus_elbow <- function(X_num, similarity = "spearman") {
     x0 <- point[1]; y0 <- point[2]
     x1 <- start[1]; y1 <- start[2]
     x2 <- end[1]; y2 <- end[2]
-    abs((y2-y1)*x0 - (x2-x1)*y0 + x2*y1 - y2*x1) / sqrt((y2-y1)^2 + (x2-x1)^2)
+    abs((y2 - y1) * x0 - (x2 - x1) * y0 + x2*y1 - y2*x1) / sqrt((y2 - y1)^2 + (x2 - x1)^2)
   }
 
   distances <- sapply(1:length(k_vals), function(i) {
@@ -52,15 +69,25 @@ varclus_elbow <- function(X_num, similarity = "spearman") {
 
   optimal_k <- k_vals[which.max(distances)]
 
-  # Store plot function in a separate object (closure)
+  # ----------------------------
+  # Store elbow plot function
+  # ----------------------------
   plot_elbow <- function() {
     plot(k_vals, y, type = "b", pch = 19, col = "blue",
          xlab = "Number of clusters", ylab = "intra-cluster similarity", xaxt = "n",
-         main = NULL )
+         main = NULL)
     axis(1, at = k_vals, labels = k_vals)
     points(optimal_k, y[which.max(distances)], col = "red", pch = 19, cex = 1.5)
-    text(optimal_k, y[which.max(distances)], labels = paste("K =", optimal_k), pos = 3, col = "red")
+    text(optimal_k, y[which.max(distances)],
+         labels = paste("K =", optimal_k),
+         pos = 3, col = "red")
   }
 
-  return(list(optimal_k = optimal_k, plot = plot_elbow ))
+  # ----------------------------
+  # Return results
+  # ----------------------------
+  return(list(
+    optimal_k = optimal_k,
+    plot = plot_elbow
+  ))
 }

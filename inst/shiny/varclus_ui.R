@@ -1,5 +1,6 @@
 varclus_ui <- function() {
   tagList(
+
     # ===== Title =====
     div(
       h2("Clustering numeric variables using VarClus Method"),
@@ -11,11 +12,11 @@ varclus_ui <- function() {
         color: #2c3e50;"
     ),
 
-    # ===== First row: Model Overview + Elbow Plot (40/60) =====
+    # ===== Model Overview + Elbow Plot =====
     div(
       style = "display: flex; gap: 20px; flex-wrap: nowrap; margin-bottom: 30px;",
 
-      # Model Overview
+      # ---- Model Overview ----
       div(
         style = "
           flex: 0 0 40%;
@@ -24,7 +25,8 @@ varclus_ui <- function() {
           background: #ffffff;
           box-shadow: 0 2px 8px rgba(0,0,0,0.05);
           overflow: visible;",
-        h4("VarClus model overview", style = "margin-bottom: 15px; color:#34495e; font-weight: bold;"),
+        h4("VarClus model overview",
+           style = "margin-bottom: 15px; color:#34495e; font-weight: bold;"),
         tags$head(
           tags$style(HTML("
             #varclus_print {
@@ -42,7 +44,7 @@ varclus_ui <- function() {
         verbatimTextOutput("varclus_print")
       ),
 
-      # Elbow Plot
+      # ---- Elbow Plot ----
       div(
         style = "
           flex: 0 0 60%;
@@ -50,15 +52,17 @@ varclus_ui <- function() {
           border-radius: 10px;
           background: #ffffff;
           box-shadow: 0 2px 8px rgba(0,0,0,0.05);",
-        h4("Elbow Method Plot - Optimal k Suggested", style = "margin-bottom: 15px; color:#34495e; font-weight: bold;"),
+        h4("Elbow Method Plot - Optimal k Suggested",
+           style = "margin-bottom: 15px; color:#34495e; font-weight: bold;"),
         plotOutput("varclus_elbow", height = "300px")
       )
     ),
 
-    # ===== Second row: Heatmap + Dendrogram  =====
+    # ===== Heatmap + Dendrogram  =====
     div(
       style = "display: flex; gap: 20px; flex-wrap: nowrap; margin-bottom: 30px;",
 
+      # ---- Heatmap ----
       div(
         style = "
           flex: 0 0 50%;
@@ -66,10 +70,12 @@ varclus_ui <- function() {
           border-radius: 10px;
           background: #ffffff;
           box-shadow: 0 2px 8px rgba(0,0,0,0.05);",
-        h4("Heatmap - Variables Correlation", style = "margin-bottom: 15px; color:#34495e; font-weight: bold;"),
-        plotlyOutput("varclus_heatmap", height = "400px")
+        h4("Heatmap - Variables Correlation",
+           style = "margin-bottom: 15px; color:#34495e; font-weight: bold;"),
+        plotly::plotlyOutput("varclus_heatmap", height = "400px")
       ),
 
+      # ---- Dendrogram ----
       div(
         style = "
           flex: 0 0 50%;
@@ -77,12 +83,13 @@ varclus_ui <- function() {
           border-radius: 10px;
           background: #ffffff;
           box-shadow: 0 2px 8px rgba(0,0,0,0.05);",
-        h4("Dendrogram - Colored Clusters", style = "margin-bottom: 15px; color:#34495e; font-weight: bold;"),
+        h4("Dendrogram - Colored Clusters",
+           style = "margin-bottom: 15px; color:#34495e; font-weight: bold;"),
         plotOutput("varclus_dendrogram", height = "400px")
       )
     ),
 
-    # ===== Third row: Cluster Summary =====
+    # ===== Cluster Summary =====
     div(
       style = "
         padding: 20px;
@@ -90,13 +97,11 @@ varclus_ui <- function() {
         background: #ffffff;
         box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         margin-bottom: 40px;",
-      h4("VarClus Model - Clusters Summary", style = "margin-bottom: 15px; color:#34495e; font-weight: bold;"),
+      h4("VarClus Model - Clusters Summary",
+         style = "margin-bottom: 15px; color:#34495e; font-weight: bold;"),
       verbatimTextOutput("varclus_summary_text"),
       tableOutput("varclus_cluster_summary"),
       tableOutput("varclus_R2_summary")
     )
   )
 }
-
-
-
