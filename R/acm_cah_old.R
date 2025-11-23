@@ -111,7 +111,7 @@ ClustModalities <- R6::R6Class(
 
         self$hclust <- stats::hclust(self$dist_mat, method = "ward.D2")
 
-        # ------------------ ACM ------------------
+      # ------------------ ACM ------------------
       } else {
 
         nf <- if (is.null(self$n_axes)) 2 else min(self$n_axes, 2)
