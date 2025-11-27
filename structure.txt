@@ -11,6 +11,12 @@ C:.
 ¦   README.md
 ¦   structure.txt
 ¦   
++---data
+¦       AUTOS2005.txt
+¦       crime_dataset_from_DASL.xls
+¦       loisirs.txt
+¦       vote_catvarclus.xls
+¦       
 +---inst
 ¦   +---shiny
 ¦       ¦   app.R
@@ -28,6 +34,8 @@ C:.
 ¦       kmeans.R
 ¦       n_clusters.R
 ¦       test_clust_modalites.R
+¦       TEST_FINAL_CAH.R
+¦       TEST_FINAL_KMEANS.R
 ¦       test_kmeans.R
 ¦       utils.R
 ¦       varclus.R
@@ -37,4 +45,5 @@ C:.
             test-CAH.R
             test-kmeans.R
             test-varclus.R
+            test_elbow.R
             

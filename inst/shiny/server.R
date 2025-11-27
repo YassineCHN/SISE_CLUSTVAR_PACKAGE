@@ -1,188 +1,48 @@
-source("../../R/utils.R")
-source("../../R/clusterengine.R")
-source("../../R/n_clusters.R")
-source("varclus_ui.R")
-source("../../R/varclus.R")
+# ---------------------------
+# Server.R for ClusteringVariables Shiny App
+# ---------------------------
 
-library(shinyjs)
+source("varclus_ui.R")
+source("kmeans_ui.R")
+source("acm_cah_ui.R")
 
 server <- function(input, output, session) {
 
-  # ---- Reactive values to track run and frozen selections ----
-  run_clicked <- reactiveVal(FALSE)
-  frozen_algo <- reactiveVal(NULL)
-  frozen_active_vars <- reactiveVal(NULL)
-  frozen_data <- reactiveVal(NULL)
-  frozen_n_clusters <- reactiveVal(NULL)
+  # Store all uploaded datasets
+  datasets <- reactiveValues(data = list())
 
-
-  # ---- Data upload ----
-  data_uploaded <- reactive({
+  # ---------------------------
+  # Reactive preview of the CSV
+  # ---------------------------
+  preview_data <- reactive({
     req(input$file1)
-
     tryCatch(
-      {
-        df <- read.csv(input$file1$datapath,
-                       header = input$header,
-                       sep = input$sep)
-        df
-      },
-      error = function(e) {
-        stop(safeError(e))
-      }
+      read.csv(
+        input$file1$datapath,
+        header = input$header,
+        sep = input$sep,
+        quote = input$quote
+      ),
+      error = function(e) NULL
     )
   })
 
-  #--------number of clusters choice------
-  observe({
-    if (input$auto_k) {
-      shinyjs::disable("num_k")
-    } else {
-      shinyjs::enable("num_k")
-    }
-  })
-
-  # ---- Run Clustering button ----
-  observeEvent(input$run_clustering, {
-    req(data_uploaded())
-    frozen_algo(input$algorithm)
-    frozen_active_vars(input$active_vars)
-    frozen_data(data_uploaded())
-    frozen_n_clusters(if (input$auto_k) NULL else input$num_k)
-    run_clicked(TRUE)
-  })
-
-
-  # ---- Main content UI ----
-  output$main_content <- renderUI({
-
-    # Welcome page if Run Clustering never clicked
-    if(!run_clicked()){
-      tagList(
-        # ===== Title =====
-        fluidRow(
-          style = "margin-bottom: 25px;",
-          column(
-            width = 12,
-            div(
-              style = "display: flex; align-items: center; ; justify-content: center; gap: 15px;",
-              img(src = "cluster.png", height = "80px"),
-              h1("Welcome to Clustering Variables Application!",
-                 style = "margin:0; font-weight:600; font-size:2.2em;")
-            )
-          )
-        ),
-
-        # ===== Description =====
-        fluidRow(
-          column(
-            width = 12,
-            p(
-              "This application offers an interactive interface for the ",
-              strong("ClusteringVariables"), " R package, enabling users to cluster variables and analyze their relationships in datasets. ",
-              "The package was developed by ", em("Lamia Hatem"), ", ", em("Yasine Cheniour"),
-              ", and ", em("Maissa Lajimi"), " as part of their coursework in the Master SISE program at the University of Lyon 2. The following clustering methods are provided:",
-              style = "font-size:16px; line-height:1.7; color:#444; max-width:900px; margin:auto; text-align: justify;"
-            )
-          )
-        ),
-
-        # ===== Clustering Methods =====
-        fluidRow(
-          column(
-            width = 12,
-            div(
-              style = "max-width:900px; margin:auto; margin-top:10px; font-size:16px; line-height:1.7; color:#444; text-align: justify;",
-              tags$ul(
-                style = "padding-left:20px;",
-                tags$li(strong("🎯 KMeans (Quantitative Variables) – "),
-                        "A reallocation-based algorithm."),
-                tags$li(strong("📊 VarClus (Quantitative Variables) – "),
-                        "Specifically designed for continuous data, uses a divisive hierarchical approach."),
-                tags$li(strong("🧩MCA/CAH (Qualitative Variables) – "),
-                        "Two-step approach: MCA for dimension reduction, then CAH for clustering categorical variables.")
-              )
-            )
-          )
-        ),
-
-        # ===== GitHub Button =====
-        div(
-          style = "max-width:900px; margin:auto; margin-top:0px; display:flex; justify-content:flex-end;",
-          tags$a(
-            href = "https://github.com/maissaladjimi/SISE_Clustering_Variables_R",
-            target = "_blank",
-            class = "btn",
-            style = "
-                  display: inline-flex;
-                  align-items: center;
-                  gap: 8px;
-                  font-weight: 500;
-                  font-size: 16px;
-                  border-radius: 8px;
-                  padding: 10px 18px;
-                  border: none;
-                  background-color: #24292e;
-                  color: #ffffff;
-                  text-transform: none;
-                  text-decoration: none;
-                ",
-            tags$img(
-              src = "github.png",
-              height = "22px",
-              style = "vertical-align: middle;"
-            ),
-            "App GitHub Repository"
-          )
-        ),
-
-        # ===== Data Preview =====
-        tags$hr(style = "border: 0; border-top: 1px solid #ccc; margin: 20px 0;"),
-
-        fluidRow(
-          column(
-            width = 12,
-            h4("Preview of uploaded data"),
-            uiOutput("data_preview")
-          )
-        )
-      )
-    } else {
-      # Button clicked → show results based on selected algorithm
-      algo <- frozen_algo()
-
-      # kmeans results --------------
-
-      if(algo == "kmeans"){
-        tagList(h3("K-Means Clustering Results")
-                )
-      # varclus results --------------
-      } else if(algo == "varclus"){
-          varclus_ui()
-
-      # acm_cah results --------------
-      } else if(algo == "acm_cah"){
-        tagList(h3("MCA & CAH (Qualitative) Results"))
-      }
-    }
-  })
-
-  # ----------------------------------------------------------------------------
-
-  # ---- Data Preview ----
+  # ---------------------------
+  # Show preview in Data Import tab
+  # ---------------------------
   output$data_preview <- renderUI({
     if (is.null(input$file1)) {
       div(
         style = "font-style: italic; color: #666; font-size: 16px; margin-top:10px; padding: 10px; border: 1px dashed #ccc; border-radius: 6px; background-color:#f9f9f9;",
-        " 📂 Please upload a dataset to get started."
+        "📂 Please upload a dataset to get started."
       )
     } else {
-      df <- data_uploaded()
+      df <- preview_data()
+      if (is.null(df)) return(div("Error reading file with current settings"))
       n_quanti <- sum(sapply(df, is.numeric))
       n_quali  <- sum(sapply(df, function(x) !is.numeric(x)))
 
       fluidRow(
-        # Left column: summary
         column(
           width = 3,
           div(
@@ -194,7 +54,6 @@ server <- function(input, output, session) {
             paste("Qualitative variables:", n_quali)
           )
         ),
-        # Right column: table preview
         column(
           width = 9,
           tableOutput("contents")
@@ -203,102 +62,241 @@ server <- function(input, output, session) {
     }
   })
 
-  # ---- Display only the first few rows ----
   output$contents <- renderTable({
-    req(data_uploaded())
-    head(data_uploaded())
+    req(preview_data())
+    head(preview_data())
   })
 
-  # ---- Active/Illustrative variables choice----
-  observeEvent(data_uploaded(), {
-    run_clicked(FALSE)
+  # ---------------------------
+  # Upload button: Save dataset based on user choice
+  # ---------------------------
 
-    df <- data_uploaded()
+  save_msg <- reactiveVal(NULL)
+  observeEvent(input$file1, {
+    save_msg(NULL)
+  })
+
+  observeEvent(input$save_dataset, {
+    req(preview_data())
+    datasets$data[[input$file1$name]] <- preview_data()
+
+    # Update dropdown in Clustering tab
+    updateSelectInput(
+      session,
+      "dataset_choice",
+      choices = names(datasets$data),
+      selected = input$file1$name
+    )
+
+    save_msg(
+      div(
+        style = "color: green; font-weight: bold; margin-top: 10px;",
+        HTML("✅ Dataset saved successfully!"))
+    )
+
+    output$save_msg <- renderUI({
+      save_msg()
+    })
+  })
+
+  # ---------------------------
+  # Update variable selectors when dataset changes
+  # ---------------------------
+  observeEvent(input$dataset_choice, {
+    req(datasets$data)
+    df <- datasets$data[[input$dataset_choice]]
+    req(df)
     cols <- names(df)
 
     updateSelectInput(session, "active_vars", choices = cols)
     updateSelectInput(session, "illustrative_vars", choices = cols)
   })
 
+  # ---------------------------
+  # Ensure active / illustrative variables are mutually exclusive
+  # ---------------------------
   observeEvent(input$active_vars, {
-    if (!is.null(input$file1)) {
-      updateSelectInput(session, "illustrative_vars",
-                        choices = setdiff(names(data_uploaded()), input$active_vars),
-                        selected = intersect(input$illustrative_vars,
-                                             setdiff(names(data_uploaded()), input$active_vars)))
-    }
+    req(input$dataset_choice)
+    df <- datasets$data[[input$dataset_choice]]
+    updateSelectInput(
+      session,
+      "illustrative_vars",
+      choices  = setdiff(names(df), input$active_vars),
+      selected = intersect(input$illustrative_vars,
+                           setdiff(names(df), input$active_vars))
+    )
   })
 
   observeEvent(input$illustrative_vars, {
-    if (!is.null(input$file1)) {
-      updateSelectInput(session, "active_vars",
-                        choices = setdiff(names(data_uploaded()), input$illustrative_vars),
-                        selected = intersect(input$active_vars,
-                                             setdiff(names(data_uploaded()), input$illustrative_vars)))
+    req(input$dataset_choice)
+    df <- datasets$data[[input$dataset_choice]]
+    updateSelectInput(
+      session,
+      "active_vars",
+      choices  = setdiff(names(df), input$illustrative_vars),
+      selected = intersect(input$active_vars,
+                           setdiff(names(df), input$illustrative_vars))
+    )
+  })
+
+  # ---------------------------
+  # Return selected dataset for clustering
+  # ---------------------------
+  selected_data <- reactive({
+    req(input$dataset_choice)
+    datasets$data[[input$dataset_choice]]
+  })
+
+  # Disable slider when auto_k checked
+  observe({
+    if (isTRUE(input$auto_k)) {
+      disable("num_k")
+    } else {
+      enable("num_k")
+    }
+  })
+
+  # ---------------------------
+  # Clustering Output
+  # ---------------------------
+
+  clustering_result <- eventReactive(input$run_clustering, {
+    list(
+      algo = input$algorithm
+    )
+  })
+
+  output$clustering_output <- renderUI({
+    req(clustering_result())
+
+    algo <- clustering_result()$algo
+
+    if (algo == "kmeans") {
+      tagList(
+        h3("KMeans Results")
+      )
+    }
+
+    else if (algo == "varclus") {
+      tagList(
+        varclus_ui()
+      )
+    }
+
+    else if (algo == "acm_cah") {
+      tagList(
+        h3("HAC Results")
+      )
     }
   })
 
 
-  #---------- Clustering Results ------------------------------------
-
+  # ---------------------------
+  # Clustering engine
+  # ---------------------------
   clustering_engine <- eventReactive(input$run_clustering, {
-    req(frozen_data(), frozen_active_vars(), frozen_algo())
+    req(selected_data(), input$active_vars, input$algorithm)
 
-    df <- frozen_data()[, frozen_active_vars(), drop = FALSE]
+    df <- selected_data()[ , input$active_vars, drop = FALSE]
 
-    if (frozen_algo() == "varclus") {
-      df <- get_numeric_vars(df)
+    if (input$algorithm == "varclus") {
+      df <- ClusteringVariables::get_numeric_vars(df)
     }
 
-    engine <- ClusterEngine$new(
-      data = df,
-      method = frozen_algo(),
-      n_clusters = frozen_n_clusters()
+    n_clusters <- if (input$auto_k) NULL else input$num_k
+
+    engine <- ClusteringVariables::ClusterEngine$new(
+      data       = df,
+      method     = input$algorithm,
+      n_clusters = n_clusters
     )
+
     engine$fit()
     engine
   })
-  # ------------ VarClus Outputs -----------------------------------
 
-  # Elbow plot
+  # ---------------------------
+  # illustrative variables
+  # ---------------------------
+  illust_results <- reactive({
+    engine <- clustering_engine()
+    req(engine)
+    req(input$illustrative_vars)
+
+    # Subset the selected illustrative variables
+    illust_df <- selected_data()[, input$illustrative_vars, drop = FALSE]
+
+    # Apply illustrative() on the already fitted VarClus model
+    engine$model$illustrative(illust_df)
+  })
+
+  # ---------------------------
+  # VarClus outputs
+  # ---------------------------
+
+  # Elbow method plot
   output$varclus_elbow <- renderPlot({
-    req(clustering_engine())
-    clustering_engine()$model$plot_elbow()
+    engine <- clustering_engine()
+    req(engine)
+    engine$model$plot_elbow()
   })
 
-  # Dendrogram
+  # Dendrogram plot
   output$varclus_dendrogram <- renderPlot({
-    req(clustering_engine())
-    dend_fun <- clustering_engine()$model$get_dendrogram()
-    dend_fun()
+    engine <- clustering_engine()
+    req(engine)
+    engine$model$get_dendrogram()()
   })
 
-  # heatmap
-  output$varclus_heatmap <- renderPlot({
-    req(clustering_engine())
-    heat_fun <- clustering_engine()$model$get_heatmap()
-    heat_fun()
+  # Heatmap plot
+  output$varclus_heatmap <- plotly::renderPlotly({
+    engine <- clustering_engine()
+    req(engine)
+    engine$model$get_heatmap()()
   })
 
-  # Print
+  # Print method
   output$varclus_print <- renderPrint({
-    req(clustering_engine())
-    clustering_engine()$model$print()
+    engine <- clustering_engine()
+    req(engine)
+    engine$model$print()
   })
 
-  # Summary
+  # Text summary
   output$varclus_summary_text <- renderText({
-    req(clustering_engine())
-    clustering_engine()$model$summary()$text
+    engine <- clustering_engine()
+    req(engine)
+    engine$model$summary()$text
   })
 
+  # Similarity Matrix
+  output$varclus_similarity_matrix <- renderTable({
+    engine <- clustering_engine()
+    req(engine)
+    engine$model$summary()$similarity_matrix
+  })
+
+  # cluster summary
   output$varclus_cluster_summary <- renderTable({
-    req(clustering_engine())
-    clustering_engine()$model$summary()$cluster_summary
+    engine <- clustering_engine()
+    req(engine)
+    engine$model$summary()$cluster_summary
   })
 
+  # Cluster R2 details
   output$varclus_R2_summary <- renderTable({
-    req(clustering_engine())
-    clustering_engine()$model$summary()$R2_summary
+    engine <- clustering_engine()
+    req(engine)
+    engine$model$summary()$R2_summary
+  })
+
+  # Render illustrative table
+  output$varclus_illu_table <- renderTable({
+    illust_results()$table
+  })
+
+  # Render PCA correlation circle plot
+  output$varclus_illu_plot <- renderPlot({
+    illust_results()$plot()
   })
 }
