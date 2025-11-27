@@ -192,6 +192,39 @@ ClustModalities <- R6::R6Class(
                      main="Courbe des hauteurs (aggregation levels)")
       invisible(df)
     },
+    #' Elbow method with automatic detection of optimal k
+    #'
+    #' @param k_max Maximum number of clusters to consider (default: 10)
+    #' @param plot Logical, whether to display the plot (default: TRUE)
+    #' @return List with optimal_k, results data.frame, and plot function
+    #' @export
+    elbow = function(k_max = 10, plot = TRUE) {
+      if (is.null(self$data)) {
+        stop("No data available. Use fit() first.")
+      }
+
+      # Call the standalone elbow function
+      result <- acm_cah_elbow(
+        X_quali = self$data,
+        method = self$method,
+        k_max = k_max
+      )
+
+      # Display plot if requested
+      if (plot) {
+        result$plot()
+      }
+
+      # Print summary
+      cat("\n=== ACM-CAH Elbow Analysis ===\n")
+      cat(sprintf("Method: %s\n", self$method))
+      cat(sprintf("Optimal k: %d\n", result$optimal_k))
+      cat(sprintf("Range tested: 1 to %d\n", k_max))
+      cat("\nResults table:\n")
+      print(result$results)
+
+      invisible(result)
+    },
 
     # =====================================================================
     # DENDROGRAMME

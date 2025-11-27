@@ -1,0 +1,40 @@
+Structure du dossier pour le volume Windows-SSD
+Le numéro de série du volume est 0E66-421D
+C:.
+¦   .gitignore
+¦   .Rbuildignore
+¦   ClusteringVariables.Rproj
+¦   DESCRIPTION
+¦   export_r.txt
+¦   LICENSE
+¦   NAMESPACE
+¦   README.md
+¦   structure.txt
+¦   
++---inst
+¦   +---shiny
+¦       ¦   app.R
+¦       ¦   server.R
+¦       ¦   ui.R
+¦       ¦   varclus_ui.R
+¦       ¦   
+¦       +---www
+¦               cluster.png
+¦               github.png
+¦               
++---R
+¦       acm_cah.R
+¦       clusterengine.R
+¦       kmeans.R
+¦       n_clusters.R
+¦       test_clust_modalites.R
+¦       test_kmeans.R
+¦       utils.R
+¦       varclus.R
+¦       
++---tests
+    +---testthat
+            test-CAH.R
+            test-kmeans.R
+            test-varclus.R
+            
