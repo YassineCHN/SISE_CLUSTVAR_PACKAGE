@@ -128,7 +128,7 @@ kmeans_elbow <- function(X_num, k_range = 2:10, n_init = 20, seed = NULL) {
     km <- KMeansVariablesQuant$new(k = k, n_init = n_init, seed = seed)
     km$fit(X_num)
 
-    inertia <- km$inertie_total
+    inertia <- km$inertia_total
     gain <- if (nrow(results) == 0) NA else inertia - results$inertia[nrow(results)]
 
     results <- rbind(results, data.frame(k = k, inertia = inertia, gain = gain))
