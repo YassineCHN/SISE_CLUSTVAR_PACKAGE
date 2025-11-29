@@ -465,34 +465,44 @@ ClustModalities <- R6::R6Class(
         if (self$method == "acm" && !is.null(self$mod_coords)) {
           # Carte factorielle avec modalités actives et illustratives
           coords_active <- self$mod_coords[, 1:2]
+          cols_clusters <- rainbow(K)
 
+          # Points actifs : couleur = cluster
           plot(coords_active[, 1], coords_active[, 2],
-               pch = 19, col = rainbow(K)[self$mod_clusters],
+               pch = 19,
+               col = cols_clusters[self$mod_clusters],
                xlab = "Dim 1", ylab = "Dim 2",
-               main = "Modalités actives (couleur) et illustratives (rouge)")
+               main = "Modalités actives et illustratives")
 
           text(coords_active[, 1], coords_active[, 2],
-               labels = rownames(coords_active), pos = 3, cex = 0.6,
-               col = rainbow(K)[self$mod_clusters])
+               labels = rownames(coords_active),
+               pos = 3, cex = 0.7,
+               col = cols_clusters[self$mod_clusters])
 
-          # Ajouter modalités illustratives en rouge
+          # Ajouter modalités illustratives, colorées selon cluster_assigned
           if (exists("coords_illust")) {
+            cl_assigned <- result_table$cluster_assigned[
+              match(rownames(coords_illust), result_table$modality)
+            ]
+            cols_illust <- cols_clusters[cl_assigned]
+
             points(coords_illust[, 1], coords_illust[, 2],
-                   pch = 17, col = "red", cex = 1.5)
+                   pch = 17, col = cols_illust, cex = 1.5)
             text(coords_illust[, 1], coords_illust[, 2],
-                 labels = rownames(coords_illust), pos = 3, cex = 0.7,
-                 col = "red", font = 2)
+                 labels = rownames(coords_illust),
+                 pos = 3, cex = 0.8,
+                 col = cols_illust, font = 2)
           }
 
           abline(h = 0, v = 0, lty = 3)
 
           legend("topright",
                  legend = c(paste("Cluster", 1:K), "Illustrative"),
-                 col = c(rainbow(K), "red"),
+                 col = c(cols_clusters, "black"),
                  pch = c(rep(19, K), 17),
                  cex = 0.8)
         } else {
-          # Pour DICE, barplot des distances
+          # Pour DICE, barplot des distances (inchangé)
           par(mfrow = c(min(2, ceiling(nrow(result_table)/2)), 2))
 
           for (i in 1:min(nrow(result_table), 4)) {

@@ -245,8 +245,16 @@ varclus_server <- function(engine_reactive, input = NULL, output = NULL, session
   output$varclus_heatmap <- renderPlot({
     req(varclus_model())
     tryCatch({
-      cor_matrix <- cor(varclus_model()$X)
-      heatmap(cor_matrix,
+      cor_mat <- varclus_model()$model$sim
+      if (is.null(cor_mat)) {
+        stop("Similarity matrix not found in VarClus model.")
+      }
+      if (!is.matrix(cor_mat)) {
+        cor_mat <- as.matrix(cor_mat)
+      }
+
+      n <- nrow(cor_mat)
+      heatmap(cor_mat,
               col = colorRampPalette(c("blue", "white", "red"))(100),
               scale = "none",
               main = "Correlation Heatmap",

@@ -238,31 +238,44 @@ kmeansServer <- function(id, engine_reactive) {
       req(kmeans_model())
       illust_data <- illustrative_data()
 
+      # On garde uniquement les illustratives numériques
+      if (!is.null(illust_data)) {
+        illust_data <- illust_data[, sapply(illust_data, is.numeric), drop = FALSE]
+      }
+
       if (!is.null(illust_data) && ncol(illust_data) > 0) {
         tryCatch({
-          # Obtenir les scores des individus sur PC1 et PC2
-          scores <- kmeans_model()$X_std %*% kmeans_model()$pca$rotation[, 1:2]
+          centers <- kmeans_model()$centers
 
-          # Calculer corrélations des illustratives avec PC1 et PC2
-          cor_illust <- cor(illust_data, scores)
+          if (is.null(centers) || ncol(centers) < 2) {
+            stop("At least 2 clusters are required to draw a correlation circle.")
+          }
 
-          # Plot
-          plot(cor_illust, xlim = c(-1, 1), ylim = c(-1, 1),
-               xlab = "PC1", ylab = "PC2",
-               main = "Illustrative Variables on Correlation Circle",
-               pch = 17, col = "red", cex = 1.5)
+          # On prend les deux premières composantes latentes (PC1 des 2 premiers clusters)
+          scores <- centers[, 1:2, drop = FALSE]
 
-          # Cercle
-          theta <- seq(0, 2*pi, length = 100)
-          lines(cos(theta), sin(theta), col = "gray50")
+          # Corrélations des illustratives avec les deux composantes latentes
+          cor_illust <- stats::cor(illust_data, scores, use = "pairwise.complete.obs")
 
-          # Labels
-          text(cor_illust[,1], cor_illust[,2],
-               labels = rownames(cor_illust),
-               col = "red", pos = 3, cex = 0.8)
+          x <- cor_illust[, 1]
+          y <- cor_illust[, 2]
+          lab <- rownames(cor_illust)
 
-          # Axes
-          abline(h = 0, v = 0, col = "gray70", lty = 2)
+          # Cercle unité
+          theta <- seq(0, 2 * pi, length.out = 200)
+          circle_x <- cos(theta)
+          circle_y <- sin(theta)
+
+          plot(circle_x, circle_y, type = "l",
+               xlim = c(-1.1, 1.1), ylim = c(-1.1, 1.1),
+               asp = 1,
+               xlab = "Latent component 1",
+               ylab = "Latent component 2",
+               main = "Illustrative variables on latent components")
+          abline(h = 0, v = 0, lty = 3, col = "grey70")
+
+          points(x, y, pch = 17, col = "red", cex = 1.3)
+          text(x, y, labels = lab, pos = 3, cex = 0.8, col = "red")
 
         }, error = function(e) {
           plot.new()
@@ -270,7 +283,7 @@ kmeansServer <- function(id, engine_reactive) {
         })
       } else {
         plot.new()
-        text(0.5, 0.5, "No illustrative variables", cex = 1.2, col = "gray")
+        text(0.5, 0.5, "No numeric illustrative variables", cex = 1.2, col = "gray")
       }
     })
 

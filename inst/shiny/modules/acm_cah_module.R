@@ -123,51 +123,52 @@ acm_cah_ui <- function() {
         )
       ),
 
-      # ========== TAB 4: ILLUSTRATIVE VARIABLES (NOUVEAU!) ==========
+      # ========== TAB 4: ILLUSTRATIVE VARIABLES (MERGED) ==========
       tabPanel(
         "🔍 Illustrative Variables",
         value = "illustrative",
         br(),
 
+        ##### SECTION 1 — QUALITATIVE #####
         fluidRow(
           column(
             width = 12,
             div(
               style = "background: #f7fafc; padding: 20px; border-radius: 8px; border-left: 4px solid #ed8936;",
-              h4("📌 Illustrative Variables Analysis", style = "color: #2d3748; font-weight: 600; margin-top: 0;"),
-              p("Project qualitative illustrative variables onto the existing clusters.
-                 For DICE: average Dice² distance to cluster members.
-                 For ACM: euclidean distance to cluster barycenters in factorial space.",
-                style = "color: #4a5568; font-size: 15px;")
+              h4("📌 Qualitative Illustrative Variables",
+                 style = "color: #2d3748; font-weight: 600; margin-top: 0;"),
+              p("Projection of qualitative variables onto clusters:",
+                style = "color: #4a5568; font-size: 15px;"),
+              p("• DICE → mean Dice² distance to cluster modalities",
+                style = "color: #4a5568; font-size: 14px;"),
+              p("• ACM → Euclidean distance to cluster barycenters",
+                style = "color: #4a5568; font-size: 14px;")
             )
           )
         ),
 
         br(),
+        uiOutput("acm_cah_illustrative_content"),
 
-        uiOutput("acm_cah_illustrative_content")
-      ),
 
-      # ========== TAB 5: ILLUSTRATIVE NUMERIC (NOUVEAU!) ==========
-      tabPanel(
-        "🔢 Illustrative Numeric",
-        value = "illustrative_numeric",
-        br(),
+        br(), br(),
 
+        hr(style = "border-top: 2px solid #CBD5E0; margin: 40px 0;"),
+        ##### SECTION 2 — NUMERIQUE #####
         fluidRow(
           column(
             width = 12,
             div(
               style = "background: #f7fafc; padding: 20px; border-radius: 8px; border-left: 4px solid #4299e1;",
-              h4("📊 Quantitative Illustrative Variables", style = "color: #2d3748; font-weight: 600; margin-top: 0;"),
-              p("Project quantitative variables on MCA factorial space.",
+              h4("📊 Quantitative Illustrative Variables",
+                 style = "color: #2d3748; font-weight: 600; margin-top: 0;"),
+              p("Correlation of quantitative variables with MCA dimensions.",
                 style = "color: #4a5568; font-size: 15px;")
             )
           )
         ),
 
         br(),
-
         uiOutput("acm_cah_illustrative_numeric_content")
       ),
     )
@@ -457,7 +458,7 @@ acm_cah_server <- function(engine_reactive, input = NULL, output = NULL, session
 
     if (!is.null(illust_num) && ncol(illust_num) > 0) {
       tryCatch({
-        acm_cah_model()$illustrative_numeric(illust_num)
+        acm_cah_model()$illustrative_numeric(illust_num, plot = FALSE)
       }, error = function(e) {
         showNotification(paste("Error:", e$message), type = "error", duration = 10)
         NULL
@@ -497,8 +498,25 @@ acm_cah_server <- function(engine_reactive, input = NULL, output = NULL, session
   })
 
   output$acm_cah_illustrative_numeric_plot <- renderPlot({
-    req(illustrative_numeric_results())
-    illustrative_numeric_results()
+    cors <- illustrative_numeric_results()
+    req(cors)
+
+    # Cercle unité
+    t <- seq(0, 2 * pi, length.out = 200)
+    circle_x <- cos(t)
+    circle_y <- sin(t)
+
+    plot(circle_x, circle_y, type = "l",
+         xlim = c(-1.1, 1.1), ylim = c(-1.1, 1.1),
+         asp = 1,
+         xlab = "Correlation with Dim 1",
+         ylab = "Correlation with Dim 2",
+         main = "Cercle des corrélations — illustratives quantitatives")
+    abline(h = 0, v = 0, lty = 3, col = "grey70")
+
+    points(cors$cor.Dim1, cors$cor.Dim2, pch = 19)
+    text(cors$cor.Dim1, cors$cor.Dim2,
+         labels = rownames(cors), pos = 3, cex = 0.8)
   })
 
   # Return model for external use
