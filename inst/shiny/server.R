@@ -1,6 +1,6 @@
 # =============================================================================
 # inst/shiny/server.R
-# Logique serveur de l'application Shiny - VERSION FINALE
+# Logique serveur de l'application Shiny - VERSION FINALE AVEC ILLUSTRATIVE
 # =============================================================================
 
 library(shiny)
@@ -300,11 +300,10 @@ server <- function(input, output, session) {
   })
 
   # ===========================================================================
-  # REACTIVE: Créer l'objet clustering
+  # REACTIVES: Variables actives et illustratives
   # ===========================================================================
 
-  clustering_engine <- eventReactive(input$run_clustering, {
-
+  active_data <- eventReactive(input$run_clustering, {
     req(selected_data(), input$active_vars)
 
     if (length(input$active_vars) < 2) {
@@ -317,299 +316,128 @@ server <- function(input, output, session) {
     }
 
     df <- selected_data()
-    X <- df[, input$active_vars, drop = FALSE]
+    df[, input$active_vars, drop = FALSE]
+  })
 
-    # =========================================================================
-    # K-MEANS
-    # =========================================================================
+  # NOUVEAU: Reactive pour variables illustratives
+  illustrative_data <- eventReactive(input$run_clustering, {
+    req(selected_data())
 
-    if (!is.null(input$algorithm) && input$algorithm == "kmeans") {
-      if (!all(sapply(X, is.numeric))) {
+    if (!is.null(input$illustrative_vars) && length(input$illustrative_vars) > 0) {
+      df <- selected_data()
+      df[, input$illustrative_vars, drop = FALSE]
+    } else {
+      NULL
+    }
+  })
+
+  # ===========================================================================
+  # REACTIVE: k optimal ou choisi
+  # ===========================================================================
+
+  k_value <- eventReactive(input$run_clustering, {
+    req(active_data())
+    req(input$algorithm)
+
+    X <- active_data()
+
+    if (input$auto_k) {
+      # Détection automatique selon l'algorithme
+
+      if (input$algorithm == "kmeans") {
+        # K-means auto-detect
+        km_temp <- KMeansVariablesQuant$new(k = 2, seed = 42)
+        km_temp$fit(X)
+        elbow_res <- km_temp$elbow(k_range = 2:min(10, ncol(X)), plot = FALSE)
+        k_opt <- elbow_res$optimal_k
+
         showNotification(
-          "K-means nécessite uniquement des variables quantitatives",
-          type = "error",
+          paste("✅ K-means: k optimal =", k_opt),
+          type = "message",
           duration = 5
         )
-        return(NULL)
-      }
 
-      withProgress(message = "Clustering en cours...", {
+        return(k_opt)
 
-        # Déterminer k optimal si demandé
-        if (input$auto_k) {
-          setProgress(0.2, detail = "Détection automatique de k...")
-
-          # Créer un objet temporaire AVEC les données pour elbow
-          km_temp <- KMeansVariablesQuant$new(
-            k = 2,  # k initial temporaire
-            max_iter = 100,
-            n_init = 10,
-            seed = 42
-          )
-
-          # Fit temporaire pour que elbow() ait accès aux données
-          km_temp$fit(X)
-
-          # Appeler elbow sur l'objet qui a maintenant les données
-          elbow_res <- km_temp$elbow(
-            k_range = 2:min(10, ncol(X)),
-            n_init = 20,
-            plot = FALSE
-          )
-          k_opt <- elbow_res$optimal_k
-
-          showNotification(
-            paste("✅ K-means: k optimal détecté =", k_opt),
-            type = "message",
-            duration = 5
-          )
-
-          # Créer l'objet final avec k optimal
-          km <- KMeansVariablesQuant$new(
-            k = k_opt,
-            max_iter = 100,
-            n_init = 10,
-            seed = 42
-          )
-
-        } else {
-          # Pas d'auto-détection : créer avec k choisi par l'utilisateur
-          km <- KMeansVariablesQuant$new(
-            k = input$num_k,
-            max_iter = 100,
-            n_init = 10,
-            seed = 42
-          )
+      } else if (input$algorithm == "acm_cah") {
+        # ACM-CAH auto-detect
+        quali_data <- X[, sapply(X, is.factor) | sapply(X, is.character), drop = FALSE]
+        if (ncol(quali_data) > 0) {
+          quali_data[] <- lapply(quali_data, factor)
         }
 
-        # Fit final
-        setProgress(0.7, detail = "Ajustement du modèle...")
-        km$fit(X)
-
-        setProgress(1, detail = "Terminé !")
-      })
-
-      # Ajouter variables illustratives si sélectionnées
-      result <- list(
-        model = km,
-        type = "kmeans"
-      )
-
-      # Ajouter variables illustratives si sélectionnées
-      if (!is.null(input$illustrative_vars) && length(input$illustrative_vars) > 0) {
-        X_illust <- df[, input$illustrative_vars, drop = FALSE]
-        # Garder uniquement les variables QUANTITATIVES (K-means = tout quantitatif)
-        X_illust_num <- X_illust[, sapply(X_illust, is.numeric), drop = FALSE]
-
-        if (ncol(X_illust_num) > 0) {
-          result$illustrative <- X_illust_num
-        }
-      }
-
-      result
-
-      # =========================================================================
-      # ACM-CAH
-      # =========================================================================
-
-    } else if (!is.null(input$algorithm) && input$algorithm == "acm_cah") {
-
-      # ACM-CAH : variables qualitatives uniquement
-      quali_data <- X[, sapply(X, is.factor) | sapply(X, is.character), drop = FALSE]
-
-      # Convertir en factors si nécessaire
-      if (ncol(quali_data) > 0) {
-        quali_data[] <- lapply(quali_data, factor)
-      }
-
-      if (ncol(quali_data) == 0) {
-        showNotification(
-          "ACM-CAH nécessite au moins une variable qualitative",
-          type = "error",
-          duration = 5
-        )
-        return(NULL)
-      }
-
-      withProgress(message = "ACM-CAH en cours...", {
-
-        # Déterminer k optimal si demandé
-        if (input$auto_k) {
-          setProgress(0.2, detail = "Détection automatique de k...")
-
-          elbow_res <- acm_cah_elbow(
-            X_quali = quali_data,
-            method = input$acm_cah_method,
-            k_max = min(10, nrow(quali_data))
-          )
-
-          k_opt <- elbow_res$optimal_k
-          suggested <- elbow_res$suggested_k  # Top 3 k candidats
-
-          showNotification(
-            paste0("✅ ACM-CAH: k optimal = ", k_opt,
-                   " (k suggérés: ", paste(suggested, collapse = ", "),
-                   ") - Vérifiez le graphique"),
-            type = "message",
-            duration = 8
-          )
-        } else {
-          k_opt <- input$num_k
-        }
-
-        setProgress(0.5, detail = "Construction du modèle...")
-
-        model <- create_acm_cah_model(
-          data = quali_data,
+        elbow_res <- acm_cah_elbow(
+          X_quali = quali_data,
           method = input$acm_cah_method,
-          n_axes = if (input$acm_cah_method == "acm") input$acm_cah_n_axes else 2,
-          k = k_opt
+          k_max = min(10, nrow(quali_data))
         )
 
-        setProgress(1, detail = "Terminé !")
-      })
+        k_opt <- elbow_res$optimal_k
 
-      list(
-        model = model,
-        type = "acm_cah"
-      )
-
-      # =========================================================================
-      # VARCLUS
-      # =========================================================================
-
-    } else if (!is.null(input$algorithm) && input$algorithm == "varclus") {
-
-      # VarClus : variables quantitatives uniquement
-      numeric_cols <- sapply(X, is.numeric)
-      quant_data <- X[, numeric_cols, drop = FALSE]
-
-      if (ncol(quant_data) == 0) {
         showNotification(
-          "VarClus nécessite au moins une variable quantitative",
-          type = "error",
+          paste("✅ ACM-CAH: k optimal =", k_opt),
+          type = "message",
+          duration = 8
+        )
+
+        return(k_opt)
+
+      } else if (input$algorithm == "varclus") {
+        # VarClus auto-detect
+        quant_data <- X[, sapply(X, is.numeric), drop = FALSE]
+        quant_data <- as.matrix(quant_data)
+        mode(quant_data) <- "numeric"
+
+        elbow_res <- varclus_elbow(X_num = quant_data, similarity = "pearson")
+        k_opt <- elbow_res$optimal_k
+
+        showNotification(
+          paste("✅ VarClus: k optimal =", k_opt),
+          type = "message",
           duration = 5
         )
-        return(NULL)
+
+        return(k_opt)
       }
-
-      if (ncol(quant_data) < 2) {
-        showNotification(
-          "VarClus nécessite au moins 2 variables quantitatives",
-          type = "error",
-          duration = 5
-        )
-        return(NULL)
-      }
-
-      # CONVERTIR EN MATRICE NUMÉRIQUE (CRITIQUE pour Hmisc::varclus)
-      quant_data <- as.matrix(quant_data)
-      mode(quant_data) <- "numeric"
-
-      withProgress(message = "VarClus en cours...", {
-
-        # Déterminer k optimal si demandé
-        if (input$auto_k) {
-          setProgress(0.2, detail = "Détection automatique de k...")
-
-          elbow_res <- varclus_elbow(
-            X_num = quant_data,
-            similarity = "pearson"
-          )
-
-          k_opt <- elbow_res$optimal_k
-
-          showNotification(
-            paste("✅ VarClus: k optimal détecté =", k_opt),
-            type = "message",
-            duration = 5
-          )
-        } else {
-          k_opt <- input$num_k
-        }
-
-        setProgress(0.5, detail = "Construction du modèle...")
-
-        model <- create_varclus_model(
-          data = quant_data,
-          similarity = "pearson",
-          n_clusters = k_opt
-        )
-
-        setProgress(1, detail = "Terminé !")
-      })
-
-      # Ajouter variables illustratives si sélectionnées
-      result <- list(
-        model = model,
-        type = "varclus"
-      )
-
-      if (!is.null(input$illustrative_vars) && length(input$illustrative_vars) > 0) {
-        X_illust <- df[, input$illustrative_vars, drop = FALSE]
-        X_illust_num <- X_illust[, sapply(X_illust, is.numeric), drop = FALSE]
-
-        if (ncol(X_illust_num) > 0) {
-          # Convertir aussi en matrice pour illustratives
-          result$illustrative <- as.matrix(X_illust_num)
-          mode(result$illustrative) <- "numeric"
-        }
-      }
-
-      result
-
     } else {
-      showNotification("Algorithme non implémenté", type = "warning")
-      NULL
+      # k manuel
+      return(input$num_k)
     }
   })
 
   # ===========================================================================
-  # MODULE SERVEUR: K-means
+  # MODULE SERVEUR: K-means (NOUVEAU AVEC ILLUSTRATIVE)
   # ===========================================================================
 
-  kmeansServer("kmeans_tab", engine_reactive = clustering_engine)
+  kmeansServer(
+    "kmeans_tab",
+    data = active_data,
+    k = k_value,
+    illustrative_vars = illustrative_data  # NOUVEAU!
+  )
 
   # ===========================================================================
-  # MODULE SERVEUR: ACM-CAH
+  # MODULE SERVEUR: ACM-CAH (NOUVEAU AVEC ILLUSTRATIVE)
   # ===========================================================================
 
-  acm_cah_model <- reactive({
-    engine <- clustering_engine()
-    if (!is.null(engine) && engine$type == "acm_cah") {
-      engine$model
-    } else {
-      NULL
-    }
-  })
-
-  acm_cah_server(model_reactive = acm_cah_model)
+  acm_cah_server(
+    input, output, session,
+    data = active_data,
+    k = k_value,
+    method = reactive(input$acm_cah_method),
+    n_axes = reactive(input$acm_cah_n_axes),
+    illustrative_vars = illustrative_data  # NOUVEAU!
+  )
 
   # ===========================================================================
-  # MODULE SERVEUR: VarClus
+  # MODULE SERVEUR: VarClus (NOUVEAU AVEC ILLUSTRATIVE)
   # ===========================================================================
-
-  varclus_model <- reactive({
-    engine <- clustering_engine()
-    if (!is.null(engine) && engine$type == "varclus") {
-      engine$model
-    } else {
-      NULL
-    }
-  })
-
-  varclus_illustrative <- reactive({
-    engine <- clustering_engine()
-    if (!is.null(engine) && engine$type == "varclus") {
-      engine$illustrative
-    } else {
-      NULL
-    }
-  })
 
   varclus_server(
-    model_reactive = varclus_model,
-    illustrative_reactive = varclus_illustrative
+    input, output, session,
+    data = active_data,
+    k = k_value,
+    illustrative_vars = illustrative_data  # NOUVEAU!
   )
 
   # ===========================================================================

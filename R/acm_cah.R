@@ -1,6 +1,12 @@
 ################################################################################
 # ClustModalities : Clustering de modalités qualitatives
 #
+# VERSION AMÉLIORÉE - AJOUTS:
+# 1. ✅ Méthode illustrative() pour variables qualitatives illustratives
+# 2. ✅ summary() amélioré avec statistiques détaillées
+# 3. ✅ print() amélioré avec plus d'informations
+# 4. ✅ project_numeric() renommé en illustrative_numeric() pour cohérence
+#
 # ─ Méthodes :
 #   • method = "dice"
 #       - distance Dice^2 sur indicatrices
@@ -8,18 +14,10 @@
 #
 #   • method = "acm"
 #       - ACM (COA) sur tableau disjonctif
-#       - coordonnées mises à l’échelle sqrt(lambda)
+#       - coordonnées mises à l'échelle sqrt(lambda)
 #       - PAS de pondération W (aligné Ricco)
 #       - CAH ward.D
 #
-# ─ Outils :
-#   - Scree plot (% inertie ou cumulée)
-#   - Contributions (% correctes)
-#   - Dendrogramme
-#   - Carte factorielle
-#   - Elbow (sans k*)
-#   - project_numeric() (cercle corrélation robuste)
-#   - predict() (corrigé)
 ################################################################################
 
 ClustModalities <- R6::R6Class(
@@ -103,7 +101,7 @@ ClustModalities <- R6::R6Class(
       # ------------------ DICE ------------------
       if (self$method == "dice") {
 
-        # 2A) Dice^2 -> CAH
+        # Dice^2 -> CAH
         self$dist_mat <- self$compute_dice_distances(self$disj)
 
         # IMPORTANT: labels bien alignés
@@ -168,11 +166,11 @@ ClustModalities <- R6::R6Class(
       h <- self$hclust$height
       n_mod <- length(self$hclust$order)
 
-      if (is.null(k_max)) k_max <- min(10, n_mod)  # focus sur petits k
+      if (is.null(k_max)) k_max <- min(10, n_mod)
 
       # hauteurs pour k = 1..n_mod
-      h_rev <- rev(h)                 # h_rev[1] = hauteur k=1
-      heights_k <- c(h_rev, 0)        # k=n_mod -> 0
+      h_rev <- rev(h)
+      heights_k <- c(h_rev, 0)
 
       k_vals <- 1:n_mod
       df <- data.frame(
@@ -192,12 +190,8 @@ ClustModalities <- R6::R6Class(
                      main="Courbe des hauteurs (aggregation levels)")
       invisible(df)
     },
+
     #' Elbow method with automatic detection of optimal k
-    #'
-    #' @param k_max Maximum number of clusters to consider (default: 10)
-    #' @param plot Logical, whether to display the plot (default: TRUE)
-    #' @return List with optimal_k, results data.frame, and plot function
-    #' @export
     elbow = function(k_max = 10, plot = TRUE) {
       if (is.null(self$data)) {
         stop("No data available. Use fit() first.")
@@ -245,30 +239,29 @@ ClustModalities <- R6::R6Class(
     # =====================================================================
     # CARTE FACTORIELLE (ACM)
     # =====================================================================
-    plot_factor_map = function(dim1=1, dim2=2, show_labels=TRUE) {
+    plot_factorial_map = function(dims = c(1,2), k = NULL) {
       if (self$method != "acm")
-        stop("plot_factor_map() uniquement en ACM.")
-
+        stop("plot_factorial_map() uniquement ACM.")
       if (is.null(self$mod_coords))
-        stop("fit() doit être exécuté avant.")
+        stop("fit() d'abord.")
 
-      x <- self$mod_coords[,dim1]
-      y <- self$mod_coords[,dim2]
+      coords <- self$mod_coords[, dims]
+      kk <- if (!is.null(k)) k else self$k
 
-      clusters <- if (!is.null(self$mod_clusters))
-        as.integer(as.factor(self$mod_clusters)) else 1
+      if (!is.null(kk) && !is.null(self$mod_clusters)) {
+        cols <- rainbow(kk)[self$mod_clusters]
+      } else {
+        cols <- "black"
+      }
 
-      xr <- range(x); yr <- range(y)
+      eig <- self$eig_raw[dims]
+      perc <- 100 * eig / sum(self$eig_raw)
 
-      plot(x, y, col=clusters, pch=19,
-           xlab=paste0("Dim ",dim1),
-           ylab=paste0("Dim ",dim2),
-           xlim=xr + c(-1,1)*.2*diff(xr),
-           ylim=yr + c(-1,1)*.2*diff(yr),
-           main="Carte factorielle des modalités (ACM)")
-
-      if (show_labels)
-        text(x, y, labels=rownames(self$mod_coords), pos=3, cex=.75)
+      plot(coords[,1], coords[,2], pch=19, col=cols,
+           xlab=paste0("Dim", dims[1], " (", round(perc[1],2), "%)"),
+           ylab=paste0("Dim", dims[2], " (", round(perc[2],2), "%)"),
+           main="Carte factorielle (modalités)")
+      text(coords[,1], coords[,2], labels=rownames(coords), pos=3, cex=.6)
 
       abline(h=0,v=0,lty=3)
     },
@@ -323,13 +316,13 @@ ClustModalities <- R6::R6Class(
     },
 
     # =====================================================================
-    # Variables quantitatives illustratives — cercle corrélations
+    # ILLUSTRATIVE NUMERIC - Variables quantitatives (cercle corrélations)
     # =====================================================================
-    project_numeric = function(X_quant, plot = TRUE) {
+    illustrative_numeric = function(X_quant, plot = TRUE) {
       if (self$method != "acm")
-        stop("project_numeric() disponible uniquement pour method='acm'.")
+        stop("illustrative_numeric() disponible uniquement pour method='acm'.")
       if (is.null(self$ind_coords))
-        stop("fit() doit être exécuté avant project_numeric().")
+        stop("fit() doit être exécuté avant illustrative_numeric().")
 
       if (!is.data.frame(X_quant))
         stop("X_quant doit être un data.frame de variables numériques.")
@@ -361,6 +354,173 @@ ClustModalities <- R6::R6Class(
       }
 
       return(as.data.frame(cors))
+    },
+
+    # =====================================================================
+    # ILLUSTRATIVE - Variables qualitatives illustratives
+    # =====================================================================
+    illustrative = function(X_illust, plot = TRUE) {
+      if (is.null(self$mod_clusters))
+        stop("fit() avec k doit être exécuté avant illustrative().")
+
+      X_illust <- self$check_data(X_illust)
+
+      if (nrow(X_illust) != nrow(self$data))
+        stop("X_illust doit avoir le même nombre d'individus que les données d'entraînement.")
+
+      # Créer le tableau disjonctif des variables illustratives
+      disj_illust <- ade4::acm.disjonctif(X_illust)
+
+      K <- self$k
+      n_mod_illust <- ncol(disj_illust)
+
+      # ============ MÉTHODE DICE ============
+      if (self$method == "dice") {
+
+        # Fonction distance Dice²
+        dice_dist <- function(m1, m2) {
+          0.5 * sum((m1 - m2)^2)
+        }
+
+        # Pour chaque modalité illustrative, calculer distance moyenne aux membres de chaque cluster
+        result_list <- list()
+
+        for (m in colnames(disj_illust)) {
+          vec_m <- disj_illust[, m]
+
+          # Distance moyenne à chaque cluster
+          mean_dist <- numeric(K)
+
+          for (k in 1:K) {
+            # Modalités membres du cluster k
+            members_k <- names(self$mod_clusters)[self$mod_clusters == k]
+
+            # Calculer distances
+            dists <- sapply(members_k, function(member) {
+              dice_dist(vec_m, self$disj[, member])
+            })
+
+            mean_dist[k] <- mean(dists)
+          }
+
+          # Cluster assigné (distance minimale)
+          assigned_cluster <- which.min(mean_dist)
+
+          result_list[[m]] <- data.frame(
+            modality = m,
+            cluster_assigned = assigned_cluster,
+            t(mean_dist),
+            stringsAsFactors = FALSE
+          )
+        }
+
+        result_table <- do.call(rbind, result_list)
+        colnames(result_table)[3:(2+K)] <- paste0("dist_cluster_", 1:K)
+        rownames(result_table) <- NULL
+
+        # ============ MÉTHODE ACM ============
+      } else {
+
+        # Projeter les modalités illustratives dans l'espace factoriel ACM
+        L <- ncol(self$ind_coords)
+        coords_illust <- matrix(0, nrow = n_mod_illust, ncol = L,
+                                dimnames = list(colnames(disj_illust),
+                                                colnames(self$ind_coords)))
+
+        for (m in colnames(disj_illust)) {
+          idx <- which(disj_illust[, m] == 1)
+          if (length(idx) > 0)
+            coords_illust[m, ] <- colMeans(self$ind_coords[idx, , drop = FALSE])
+        }
+
+        # Calculer barycentres des clusters
+        centers <- rowsum(self$mod_coords, self$mod_clusters) /
+          as.numeric(table(self$mod_clusters))
+
+        # Pour chaque modalité illustrative, calculer distance à chaque barycentre
+        result_list <- list()
+
+        for (m in colnames(disj_illust)) {
+          dists <- apply(centers, 1, function(center) {
+            sqrt(sum((coords_illust[m, ] - center)^2))
+          })
+
+          assigned_cluster <- which.min(dists)
+
+          result_list[[m]] <- data.frame(
+            modality = m,
+            cluster_assigned = assigned_cluster,
+            t(dists),
+            stringsAsFactors = FALSE
+          )
+        }
+
+        result_table <- do.call(rbind, result_list)
+        colnames(result_table)[3:(2+K)] <- paste0("dist_cluster_", 1:K)
+        rownames(result_table) <- NULL
+      }
+
+      # Fonction de visualisation
+      plot_func <- function() {
+        if (self$method == "acm" && !is.null(self$mod_coords)) {
+          # Carte factorielle avec modalités actives et illustratives
+          coords_active <- self$mod_coords[, 1:2]
+
+          plot(coords_active[, 1], coords_active[, 2],
+               pch = 19, col = rainbow(K)[self$mod_clusters],
+               xlab = "Dim 1", ylab = "Dim 2",
+               main = "Modalités actives (couleur) et illustratives (rouge)")
+
+          text(coords_active[, 1], coords_active[, 2],
+               labels = rownames(coords_active), pos = 3, cex = 0.6,
+               col = rainbow(K)[self$mod_clusters])
+
+          # Ajouter modalités illustratives en rouge
+          if (exists("coords_illust")) {
+            points(coords_illust[, 1], coords_illust[, 2],
+                   pch = 17, col = "red", cex = 1.5)
+            text(coords_illust[, 1], coords_illust[, 2],
+                 labels = rownames(coords_illust), pos = 3, cex = 0.7,
+                 col = "red", font = 2)
+          }
+
+          abline(h = 0, v = 0, lty = 3)
+
+          legend("topright",
+                 legend = c(paste("Cluster", 1:K), "Illustrative"),
+                 col = c(rainbow(K), "red"),
+                 pch = c(rep(19, K), 17),
+                 cex = 0.8)
+        } else {
+          # Pour DICE, barplot des distances
+          par(mfrow = c(min(2, ceiling(nrow(result_table)/2)), 2))
+
+          for (i in 1:min(nrow(result_table), 4)) {
+            dists <- as.numeric(result_table[i, 3:(2+K)])
+            assigned <- result_table$cluster_assigned[i]
+
+            barplot(dists,
+                    names.arg = paste0("C", 1:K),
+                    main = paste("Modalité:", result_table$modality[i]),
+                    ylab = "Distance moyenne",
+                    col = ifelse(seq_len(K) == assigned, "steelblue", "grey80"),
+                    border = "black")
+          }
+
+          par(mfrow = c(1, 1))
+        }
+      }
+
+      result <- list(
+        table = result_table,
+        plot = plot_func
+      )
+
+      if (plot) {
+        plot_func()
+      }
+
+      invisible(result)
     },
 
     # =====================================================================
@@ -415,7 +575,6 @@ ClustModalities <- R6::R6Class(
           ix <- which.min(d2)
           closest_mod <- old_names[ix]
 
-          # >>> correction clé : enlever les noms portés par mod_clusters
           cluster_i <- unname(self$mod_clusters[closest_mod])
           dist_i <- sqrt(d2[ix])
 
@@ -426,7 +585,6 @@ ClustModalities <- R6::R6Class(
           assign_cl(new_disj[, j])
         ))
 
-        # colonnes garanties clean
         colnames(res) <- c("cluster", "distance")
 
         df <- data.frame(
@@ -469,30 +627,132 @@ ClustModalities <- R6::R6Class(
     },
 
     # =====================================================================
-    # PRINT / SUMMARY
+    # PRINT / SUMMARY - AMÉLIORÉS
     # =====================================================================
     print = function(...) {
-      cat("ClustModalities (modalités qualitatives)\n")
-      cat("method :", self$method,"\n")
-      if (!is.null(self$data))
-        cat("n individus :",nrow(self$data),
-            " | variables :",ncol(self$data),
-            " | modalités :", if (!is.null(self$disj)) ncol(self$disj),"\n")
-      if (!is.null(self$k)) cat("k =", self$k,"\n")
+      cat("========================================\n")
+      cat("  CLUSTERING DE MODALITÉS QUALITATIVES\n")
+      cat("========================================\n")
+      cat(sprintf("Méthode: %s\n", toupper(self$method)))
+
+      if (!is.null(self$data)) {
+        cat(sprintf("\nDonnées:\n"))
+        cat(sprintf("  - Individus                 : %d\n", nrow(self$data)))
+        cat(sprintf("  - Variables qualitatives    : %d\n", ncol(self$data)))
+        if (!is.null(self$disj)) {
+          cat(sprintf("  - Modalités totales         : %d\n", ncol(self$disj)))
+        }
+      }
+
+      if (!is.null(self$k)) {
+        cat(sprintf("\nClustering:\n"))
+        cat(sprintf("  - Nombre de clusters (k)    : %d\n", self$k))
+        if (!is.null(self$mod_clusters)) {
+          tbl <- table(self$mod_clusters)
+          cat(sprintf("\nTaille des clusters:\n"))
+          for (i in 1:length(tbl)) {
+            cat(sprintf("  - Cluster %d                 : %d modalités\n", i, tbl[i]))
+          }
+        }
+      }
+
+      if (self$method == "acm" && !is.null(self$eig_raw)) {
+        cat(sprintf("\nACM:\n"))
+        cat(sprintf("  - Inertie totale            : %.4f\n", sum(self$eig_raw)))
+        cat(sprintf("  - Inertie Dim1              : %.2f%%\n",
+                    100 * self$eig_raw[1] / sum(self$eig_raw)))
+        cat(sprintf("  - Inertie Dim2              : %.2f%%\n",
+                    100 * self$eig_raw[2] / sum(self$eig_raw)))
+      }
+
+      cat("========================================\n")
       invisible(self)
     },
 
-    summary = function(...) {
-      self$print()
-      if (self$method=="acm" && !is.null(self$eig_raw)) {
-        cat("\nValeurs propres (5 premières) :\n"); print(head(self$eig_raw,5))
-        cat("\nBenzécri (5 premières) :\n"); print(head(self$eig_benzecri,5))
-        cat("\nGreenacre (5 premières) :\n"); print(head(self$eig_greenacre,5))
+    summary = function(print_output = TRUE) {
+      if (is.null(self$data))
+        stop("fit() doit être exécuté avant summary().")
+
+      # Statistiques de base
+      basic_stats <- data.frame(
+        metric = c("Nombre d'individus", "Nombre de variables", "Nombre de modalités"),
+        value = c(nrow(self$data), ncol(self$data),
+                  if (!is.null(self$disj)) ncol(self$disj) else NA),
+        stringsAsFactors = FALSE
+      )
+
+      # Statistiques ACM si applicable
+      acm_stats <- NULL
+      if (self$method == "acm" && !is.null(self$eig_raw)) {
+        inertia_pct <- 100 * self$eig_raw / sum(self$eig_raw)
+        acm_stats <- data.frame(
+          dimension = 1:min(5, length(self$eig_raw)),
+          eigenvalue = round(head(self$eig_raw, 5), 4),
+          inertia_pct = round(head(inertia_pct, 5), 2),
+          cumulative_pct = round(head(cumsum(inertia_pct), 5), 2),
+          stringsAsFactors = FALSE
+        )
       }
+
+      # Statistiques des clusters si k défini
+      cluster_stats <- NULL
+      cluster_composition <- NULL
+
       if (!is.null(self$mod_clusters)) {
-        cat("\nTaille clusters :\n"); print(table(self$mod_clusters))
+        # Taille des clusters
+        cluster_sizes <- as.numeric(table(self$mod_clusters))
+        cluster_stats <- data.frame(
+          cluster = 1:self$k,
+          n_modalities = cluster_sizes,
+          pct_total = round(100 * cluster_sizes / sum(cluster_sizes), 2),
+          stringsAsFactors = FALSE
+        )
+
+        # Composition détaillée par cluster
+        cluster_composition <- data.frame(
+          cluster = self$mod_clusters,
+          modality = names(self$mod_clusters),
+          stringsAsFactors = FALSE
+        )
+        cluster_composition <- cluster_composition[order(cluster_composition$cluster,
+                                                         cluster_composition$modality), ]
       }
-      invisible(self)
+
+      if (print_output) {
+        self$print()
+
+        cat("\n========================================\n")
+        cat("  STATISTIQUES DE BASE\n")
+        cat("========================================\n")
+        print(basic_stats, row.names = FALSE)
+
+        if (!is.null(acm_stats)) {
+          cat("\n========================================\n")
+          cat("  VALEURS PROPRES ACM\n")
+          cat("========================================\n")
+          print(acm_stats, row.names = FALSE)
+        }
+
+        if (!is.null(cluster_stats)) {
+          cat("\n========================================\n")
+          cat("  STATISTIQUES DES CLUSTERS\n")
+          cat("========================================\n")
+          print(cluster_stats, row.names = FALSE)
+
+          cat("\n========================================\n")
+          cat("  COMPOSITION DES CLUSTERS (top 30)\n")
+          cat("========================================\n")
+          print(head(cluster_composition, 30), row.names = FALSE)
+        }
+      }
+
+      invisible(list(
+        basic_stats = basic_stats,
+        acm_stats = acm_stats,
+        cluster_stats = cluster_stats,
+        cluster_composition = cluster_composition,
+        method = self$method
+      ))
     },
 
     get_clusters_table = function() {
@@ -512,5 +772,5 @@ ClustModalities <- R6::R6Class(
 )
 
 ################################################################################
-# FIN VERSION FINALE
+# FIN VERSION AMÉLIORÉE
 ################################################################################

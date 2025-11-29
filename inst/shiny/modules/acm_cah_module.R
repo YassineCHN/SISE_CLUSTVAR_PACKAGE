@@ -1,444 +1,409 @@
-################################################################################
-# MODULE ACM-CAH (Analyse Correspondances Multiples + CAH)
-#
-# Classification des MODALITÉS de variables qualitatives
-# 2 méthodes : "dice" (distance Dice) ou "acm" (ACM + CAH sur coords factorielles)
-#
-# Cohérence 100% avec classe R6 ClustModalities (acm_cah.R)
-################################################################################
+# ==============================================================================
+# ACM-CAH MODULE - UI & SERVER
+# Module Shiny complet pour ACM-CAH avec illustrative, predict, summary
+# ==============================================================================
+
+library(shiny)
+library(DT)
 
 # ==============================================================================
-# UI - ACM-CAH MODULE
+# UI MODULE
 # ==============================================================================
 
 acm_cah_ui <- function() {
   tagList(
-    # ===== Hero Section =====
-    div(
-      style = "background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%);
-               padding: 25px 20px;
-               border-radius: 10px;
-               margin-bottom: 25px;
-               box-shadow: 0 4px 15px rgba(237, 137, 54, 0.25);",
-      h3("ACM-CAH: Modalities Clustering",
-         style = "margin: 0 0 8px 0;
-                  font-weight: 700;
-                  font-size: 1.8em;
-                  color: white;
-                  text-align: center;"),
-      p("Hierarchical clustering of categorical variable modalities using Dice distance or MCA",
-        style = "text-align: center;
-                 font-size: 0.95em;
-                 color: rgba(255,255,255,0.95);
-                 margin: 0;")
-    ),
+    tabsetPanel(
+      id = "acm_cah_tabs",
+      type = "pills",
 
-    # ===== Method Selection =====
-    fluidRow(
-      column(
-        width = 12,
-      )
-    ),
+      # ========== TAB 1: SUMMARY ==========
+      tabPanel(
+        "📊 Summary",
+        value = "summary",
+        br(),
 
-    # ===== Section 1: Model Overview + Elbow =====
-    fluidRow(
-      column(
-        width = 4,
-        div(
-          style = "background: white;
-                   padding: 20px;
-                   border-radius: 10px;
-                   box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-                   border-left: 4px solid #ed8936;
-                   height: 450px;
-                   display: flex;
-                   flex-direction: column;",
-          div(
-            style = "text-align: center; margin-bottom: 15px;",
-            div(style = "font-size: 32px;", "📋"),
-            h4("Model Overview",
-               style = "margin: 5px 0 0 0; color: #2d3748; font-weight: 600; font-size: 1.2em;")
-          ),
-          div(
-            style = "flex: 1; overflow-y: auto;",
-            verbatimTextOutput("acm_cah_print")
-          )
-        )
-      ),
-      column(
-        width = 8,
-        div(
-          style = "background: white;
-                   padding: 20px;
-                   border-radius: 10px;
-                   box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-                   border-left: 4px solid #ed8936;
-                   height: 450px;",
-          div(
-            style = "display: flex; align-items: center; gap: 10px; margin-bottom: 15px;",
-            div(style = "font-size: 22px;", "📈"),
-            h4("Elbow Method",
-               style = "margin: 0; color: #2d3748; font-weight: 600; font-size: 1.2em;")
-          ),
-          plotOutput("acm_cah_elbow", height = "380px")
-        )
-      )
-    ),
-
-    tags$div(style = "height: 20px;"),
-
-    # ===== Section 2: Dendrogram + Cluster Table =====
-    fluidRow(
-      column(
-        width = 6,
-        div(
-          style = "background: white;
-                   padding: 20px;
-                   border-radius: 10px;
-                   box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-                   border-left: 4px solid #ed8936;",
-          div(
-            style = "display: flex; align-items: center; gap: 10px; margin-bottom: 15px;",
-            div(style = "font-size: 22px;", "🌳"),
-            h4("Hierarchical Dendrogram",
-               style = "margin: 0; color: #2d3748; font-weight: 600; font-size: 1.2em;")
-          ),
-          plotOutput("acm_cah_dendrogram", height = "450px")
-        )
-      ),
-      column(
-        width = 6,
-        div(
-          style = "background: white;
-                   padding: 20px;
-                   border-radius: 10px;
-                   box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-                   border-left: 4px solid #ed8936;",
-          div(
-            style = "display: flex; align-items: center; gap: 10px; margin-bottom: 15px;",
-            div(style = "font-size: 22px;", "📊"),
-            h4("Cluster Composition",
-               style = "margin: 0; color: #2d3748; font-weight: 600; font-size: 1.2em;")
-          ),
-          div(
-            style = "max-height: 450px; overflow-y: auto;",
-            DT::dataTableOutput("acm_cah_cluster_table")
-          )
-        )
-      )
-    ),
-
-    tags$div(style = "height: 20px;"),
-
-    # ===== Section 3: ACM-SPECIFIC VISUALIZATIONS =====
-    conditionalPanel(
-      condition = "input.acm_cah_method == 'acm'",
-
-      # Row 1: Factor Map + Scree Plot
-      fluidRow(
-        column(
-          width = 6,
-          div(
-            style = "background: white;
-                     padding: 20px;
-                     border-radius: 10px;
-                     box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-                     border-left: 4px solid #ed8936;",
+        fluidRow(
+          column(
+            width = 12,
             div(
-              style = "display: flex; align-items: center; gap: 10px; margin-bottom: 15px;",
-              div(style = "font-size: 22px;", "🗺️"),
-              h4("Factorial Map (MCA)",
-                 style = "margin: 0; color: #2d3748; font-weight: 600; font-size: 1.2em;")
-            ),
-            plotOutput("acm_cah_factor_map", height = "450px")
+              style = "background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
+              h4("📈 Clustering Summary", style = "color: #2d3748; font-weight: 600; margin-bottom: 20px;"),
+              verbatimTextOutput("acm_cah_summary"),
+              hr(),
+              h5("📋 Cluster Assignments (Modalities)"),
+              DTOutput("acm_cah_clusters_table")
+            )
+          )
+        )
+      ),
+
+      # ========== TAB 2: VISUALIZATIONS ==========
+      tabPanel(
+        "📈 Visualizations",
+        value = "viz",
+        br(),
+
+        fluidRow(
+          column(
+            width = 6,
+            div(
+              style = "background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
+              h5("🌳 Dendrogram", style = "color: #2d3748; font-weight: 600;"),
+              plotOutput("acm_cah_dendro", height = "400px")
+            )
+          ),
+          column(
+            width = 6,
+            div(
+              style = "background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
+              h5("📉 Elbow Plot", style = "color: #2d3748; font-weight: 600;"),
+              plotOutput("acm_cah_elbow", height = "400px")
+            )
           )
         ),
-        column(
-          width = 6,
-          div(
-            style = "background: white;
-                     padding: 20px;
-                     border-radius: 10px;
-                     box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-                     border-left: 4px solid #ed8936;",
-            div(
-              style = "display: flex; align-items: center; gap: 10px; margin-bottom: 15px;",
-              div(style = "font-size: 22px;", "📉"),
-              h4("Scree Plot (MCA)",
-                 style = "margin: 0; color: #2d3748; font-weight: 600; font-size: 1.2em;")
-            ),
-            plotOutput("acm_cah_scree", height = "450px")
-          )
-        )
-      ),
 
-      tags$div(style = "height: 20px;"),
+        br(),
 
-      # Row 2: Contributions
-      fluidRow(
-        column(
-          width = 12,
-          div(
-            style = "background: white;
-                     padding: 20px;
-                     border-radius: 10px;
-                     box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-                     border-left: 4px solid #ed8936;",
-            div(
-              style = "display: flex; align-items: center; gap: 10px; margin-bottom: 15px;",
-              div(style = "font-size: 22px;", "📊"),
-              h4("Modality Contributions (%)",
-                 style = "margin: 0; color: #2d3748; font-weight: 600; font-size: 1.2em;")
-            ),
-            fluidRow(
-              column(
-                width = 6,
-                plotOutput("acm_cah_contrib_dim1", height = "400px")
-              ),
-              column(
-                width = 6,
-                plotOutput("acm_cah_contrib_dim2", height = "400px")
+        # Factorial map (ACM only)
+        conditionalPanel(
+          condition = "input.acm_cah_method == 'acm'",
+          fluidRow(
+            column(
+              width = 12,
+              div(
+                style = "background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
+                h5("🗺️ Factorial Map (MCA)", style = "color: #2d3748; font-weight: 600;"),
+                plotOutput("acm_cah_factmap", height = "500px")
               )
             )
           )
         )
+      ),
+
+      # ========== TAB 3: MCA DETAILS (ACM only) ==========
+      tabPanel(
+        "🔬 MCA Details",
+        value = "mca",
+        br(),
+
+        conditionalPanel(
+          condition = "input.acm_cah_method == 'acm'",
+
+          fluidRow(
+            column(
+              width = 6,
+              div(
+                style = "background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
+                h5("📊 Scree Plot", style = "color: #2d3748; font-weight: 600;"),
+                plotOutput("acm_cah_scree", height = "350px")
+              )
+            ),
+            column(
+              width = 6,
+              div(
+                style = "background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
+                h5("📈 Contributions (Dimension 1)", style = "color: #2d3748; font-weight: 600;"),
+                plotOutput("acm_cah_contrib", height = "350px")
+              )
+            )
+          )
+        ),
+
+        conditionalPanel(
+          condition = "input.acm_cah_method != 'acm'",
+          div(
+            style = "text-align: center; padding: 60px; color: #718096;",
+            icon("info-circle", class = "fa-3x", style = "color: #cbd5e0;"),
+            br(), br(),
+            h5("MCA details are only available for ACM method", style = "color: #4a5568;"),
+            p("Switch to 'MCA + CAH' method in the sidebar to see MCA-specific visualizations.",
+              style = "font-size: 14px;")
+          )
+        )
+      ),
+
+      # ========== TAB 4: ILLUSTRATIVE VARIABLES (NOUVEAU!) ==========
+      tabPanel(
+        "🔍 Illustrative Variables",
+        value = "illustrative",
+        br(),
+
+        fluidRow(
+          column(
+            width = 12,
+            div(
+              style = "background: #f7fafc; padding: 20px; border-radius: 8px; border-left: 4px solid #ed8936;",
+              h4("📌 Illustrative Variables Analysis", style = "color: #2d3748; font-weight: 600; margin-top: 0;"),
+              p("Project qualitative illustrative variables onto the existing clusters.
+                 For DICE: average Dice² distance to cluster members.
+                 For ACM: euclidean distance to cluster barycenters in factorial space.",
+                style = "color: #4a5568; font-size: 15px;")
+            )
+          )
+        ),
+
+        br(),
+
+        uiOutput("acm_cah_illustrative_content")
       )
     )
   )
 }
 
-
 # ==============================================================================
-# SERVER - ACM-CAH MODULE
+# SERVER MODULE
 # ==============================================================================
 
-acm_cah_server <- function(model_reactive) {
-  # model_reactive() doit retourner un objet ClustModalities fitted
+acm_cah_server <- function(input, output, session, data, k, method, n_axes, illustrative_vars = NULL) {
 
-  moduleServer(
-    id = NULL,
-    module = function(input, output, session) {
+  # Reactive: Fit ACM-CAH model
+  acm_cah_model <- reactive({
+    req(data())
+    req(k())
+    req(method())
 
-      # ====================================================================
-      # 1. MODEL OVERVIEW (print)
-      # ====================================================================
-      output$acm_cah_print <- renderPrint({
-        req(model_reactive())
-        model <- model_reactive()
+    tryCatch({
+      # Créer instance ACM-CAH
+      n_ax <- if (method() == "acm" && !is.null(n_axes())) n_axes() else NULL
 
-        tryCatch({
-          print(model)
-        }, error = function(e) {
-          cat("Error displaying model:\n")
-          cat(e$message, "\n")
-        })
-      })
+      cm <- ClustModalities$new(method = method(), n_axes = n_ax)
 
-      # ====================================================================
-      # 2. ELBOW PLOT
-      # ====================================================================
-      output$acm_cah_elbow <- renderPlot({
-        req(model_reactive())
-        model <- model_reactive()
+      # Fit
+      cm$fit(data(), k = k())
 
-        # Synchroniser k pour ACM-CAH
-        observeEvent(input$num_k, {
-          updateNumericInput(session, "acm_cah_k", value = input$num_k)
-        })
+      cm
+    }, error = function(e) {
+      showNotification(
+        paste("Error in ACM-CAH:", e$message),
+        type = "error",
+        duration = 10
+      )
+      NULL
+    })
+  })
 
-        observeEvent(input$acm_cah_k, {
-          updateNumericInput(session, "num_k", value = input$acm_cah_k)
-        })
+  # Reactive: Summary complet
+  summary_results <- reactive({
+    req(acm_cah_model())
+    acm_cah_model()$summary(print_output = FALSE)
+  })
 
-        tryCatch({
-          model$plot_elbow(k_max = 10)
-        }, error = function(e) {
-          plot.new()
-          text(0.5, 0.5, paste("Error:", e$message), col = "red")
-        })
-      })
+  # ========== OUTPUT: SUMMARY ==========
+  output$acm_cah_summary <- renderPrint({
+    req(acm_cah_model())
+    acm_cah_model()$print()
 
-      # ====================================================================
-      # 3. DENDROGRAM
-      # ====================================================================
-      output$acm_cah_dendrogram <- renderPlot({
-        req(model_reactive())
-        model <- model_reactive()
+    cat("\n")
+    summ <- summary_results()
 
-        tryCatch({
-          model$plot_dendrogram(k = model$k)
-        }, error = function(e) {
-          plot.new()
-          text(0.5, 0.5, paste("Error:", e$message), col = "red")
-        })
-      })
+    cat("========================================\n")
+    cat("  BASIC STATISTICS\n")
+    cat("========================================\n")
+    print(summ$basic_stats, row.names = FALSE)
 
-      # ====================================================================
-      # 4. CLUSTER TABLE
-      # ====================================================================
-      output$acm_cah_cluster_table <- DT::renderDataTable({
-        req(model_reactive())
-        model <- model_reactive()
-
-        tryCatch({
-          table_data <- model$cluster_table(k = model$k)
-
-          DT::datatable(
-            table_data,
-            options = list(
-              pageLength = 15,
-              scrollY = "350px",
-              scrollCollapse = TRUE,
-              dom = 'frtip'
-            ),
-            rownames = FALSE,
-            class = 'cell-border stripe'
-          )
-        }, error = function(e) {
-          data.frame(Error = paste("Error:", e$message))
-        })
-      })
-
-      # ====================================================================
-      # 5. FACTOR MAP (ACM only)
-      # ====================================================================
-      output$acm_cah_factor_map <- renderPlot({
-        req(model_reactive())
-        req(input$acm_cah_method == "acm")
-        model <- model_reactive()
-
-        tryCatch({
-          model$plot_factor_map(dim1 = 1, dim2 = 2, show_labels = TRUE)
-        }, error = function(e) {
-          plot.new()
-          text(0.5, 0.5, paste("Error:", e$message), col = "red")
-        })
-      })
-
-      # ====================================================================
-      # 6. SCREE PLOT (ACM only)
-      # ====================================================================
-      output$acm_cah_scree <- renderPlot({
-        req(model_reactive())
-        req(input$acm_cah_method == "acm")
-        model <- model_reactive()
-
-        tryCatch({
-          model$plot_scree(cumulative = FALSE)
-        }, error = function(e) {
-          plot.new()
-          text(0.5, 0.5, paste("Error:", e$message), col = "red")
-        })
-      })
-
-      # ====================================================================
-      # 7. CONTRIBUTIONS DIM 1 (ACM only)
-      # ====================================================================
-      output$acm_cah_contrib_dim1 <- renderPlot({
-        req(model_reactive())
-        req(input$acm_cah_method == "acm")
-        model <- model_reactive()
-
-        tryCatch({
-          model$plot_contrib(dim = 1, top = 15)
-        }, error = function(e) {
-          plot.new()
-          text(0.5, 0.5, paste("Error:", e$message), col = "red")
-        })
-      })
-
-      # ====================================================================
-      # 8. CONTRIBUTIONS DIM 2 (ACM only)
-      # ====================================================================
-      output$acm_cah_contrib_dim2 <- renderPlot({
-        req(model_reactive())
-        req(input$acm_cah_method == "acm")
-        model <- model_reactive()
-
-        tryCatch({
-          model$plot_contrib(dim = 2, top = 15)
-        }, error = function(e) {
-          plot.new()
-          text(0.5, 0.5, paste("Error:", e$message), col = "red")
-        })
-      })
+    if (!is.null(summ$acm_stats)) {
+      cat("\n========================================\n")
+      cat("  MCA EIGENVALUES (top 5)\n")
+      cat("========================================\n")
+      print(head(summ$acm_stats, 5), row.names = FALSE)
     }
-  )
+
+    if (!is.null(summ$cluster_stats)) {
+      cat("\n========================================\n")
+      cat("  CLUSTER STATISTICS\n")
+      cat("========================================\n")
+      print(summ$cluster_stats, row.names = FALSE)
+    }
+  })
+
+  # ========== OUTPUT: CLUSTER TABLE ==========
+  output$acm_cah_clusters_table <- renderDT({
+    req(acm_cah_model())
+
+    clusters_df <- acm_cah_model()$get_clusters_table()
+
+    datatable(
+      clusters_df,
+      options = list(
+        pageLength = 20,
+        dom = 'Bfrtip',
+        scrollX = TRUE
+      ),
+      rownames = FALSE,
+      class = 'cell-border stripe'
+    ) %>%
+      formatStyle(
+        'cluster',
+        backgroundColor = styleEqual(
+          unique(clusters_df$cluster),
+          rainbow(length(unique(clusters_df$cluster)))
+        )
+      )
+  })
+
+  # ========== OUTPUT: DENDROGRAM ==========
+  output$acm_cah_dendro <- renderPlot({
+    req(acm_cah_model())
+    tryCatch({
+      acm_cah_model()$plot_dendrogram(k = k())
+    }, error = function(e) {
+      plot.new()
+      text(0.5, 0.5, paste("Error:", e$message), cex = 1.2, col = "red")
+    })
+  })
+
+  # ========== OUTPUT: ELBOW ==========
+  output$acm_cah_elbow <- renderPlot({
+    req(acm_cah_model())
+    tryCatch({
+      acm_cah_model()$plot_elbow(k_max = 10)
+    }, error = function(e) {
+      plot.new()
+      text(0.5, 0.5, paste("Error:", e$message), cex = 1.2, col = "red")
+    })
+  })
+
+  # ========== OUTPUT: FACTORIAL MAP (ACM only) ==========
+  output$acm_cah_factmap <- renderPlot({
+    req(acm_cah_model())
+    req(method() == "acm")
+
+    tryCatch({
+      acm_cah_model()$plot_factorial_map(dims = c(1, 2), k = k())
+    }, error = function(e) {
+      plot.new()
+      text(0.5, 0.5, paste("Error:", e$message), cex = 1.2, col = "red")
+    })
+  })
+
+  # ========== OUTPUT: SCREE PLOT (ACM only) ==========
+  output$acm_cah_scree <- renderPlot({
+    req(acm_cah_model())
+    req(method() == "acm")
+
+    tryCatch({
+      acm_cah_model()$plot_scree(cumulative = FALSE)
+    }, error = function(e) {
+      plot.new()
+      text(0.5, 0.5, paste("Error:", e$message), cex = 1.2, col = "red")
+    })
+  })
+
+  # ========== OUTPUT: CONTRIBUTIONS (ACM only) ==========
+  output$acm_cah_contrib <- renderPlot({
+    req(acm_cah_model())
+    req(method() == "acm")
+
+    tryCatch({
+      acm_cah_model()$plot_contrib(dim = 1, top = 15)
+    }, error = function(e) {
+      plot.new()
+      text(0.5, 0.5, paste("Error:", e$message), cex = 1.2, col = "red")
+    })
+  })
+
+  # ========== ILLUSTRATIVE VARIABLES (NOUVEAU!) ==========
+
+  # Reactive: Calculer illustrative si variables présentes
+  illustrative_results <- reactive({
+    req(acm_cah_model())
+
+    if (!is.null(illustrative_vars) && !is.null(illustrative_vars())) {
+      illust_data <- illustrative_vars()
+
+      if (ncol(illust_data) > 0) {
+        tryCatch({
+          acm_cah_model()$illustrative(illust_data, plot = FALSE)
+        }, error = function(e) {
+          showNotification(
+            paste("Error in illustrative:", e$message),
+            type = "error",
+            duration = 10
+          )
+          NULL
+        })
+      } else {
+        NULL
+      }
+    } else {
+      NULL
+    }
+  })
+
+  # UI dynamique pour illustrative
+  output$acm_cah_illustrative_content <- renderUI({
+    if (is.null(illustrative_results())) {
+      div(
+        style = "text-align: center; padding: 40px; color: #718096;",
+        icon("info-circle", class = "fa-3x", style = "color: #cbd5e0;"),
+        br(), br(),
+        h5("No illustrative variables selected", style = "color: #4a5568;"),
+        p("Select qualitative illustrative variables in the sidebar to see their projection onto the clusters.",
+          style = "font-size: 14px;")
+      )
+    } else {
+      tagList(
+        fluidRow(
+          column(
+            width = 12,
+            div(
+              style = "background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
+              h5("📊 Illustrative Modalities - Distance to Clusters", style = "color: #2d3748; font-weight: 600;"),
+              p(if (method() == "dice") {
+                "Average Dice² distance to cluster members (lower = closer)"
+              } else {
+                "Euclidean distance to cluster barycenters in MCA space (lower = closer)"
+              }, style = "color: #718096; font-size: 13px; margin-bottom: 15px;"),
+              DTOutput("acm_cah_illustrative_table")
+            )
+          )
+        ),
+
+        br(),
+
+        fluidRow(
+          column(
+            width = 12,
+            div(
+              style = "background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
+              h5("📈 Distance Visualization", style = "color: #2d3748; font-weight: 600;"),
+              plotOutput("acm_cah_illustrative_plot", height = "500px")
+            )
+          )
+        )
+      )
+    }
+  })
+
+  # Table illustrative
+  output$acm_cah_illustrative_table <- renderDT({
+    req(illustrative_results())
+
+    datatable(
+      illustrative_results()$table,
+      options = list(
+        pageLength = 15,
+        dom = 'Bfrtip',
+        scrollX = TRUE
+      ),
+      rownames = FALSE,
+      class = 'cell-border stripe'
+    ) %>%
+      formatStyle(
+        'cluster_assigned',
+        backgroundColor = styleEqual(
+          unique(illustrative_results()$table$cluster_assigned),
+          rainbow(length(unique(illustrative_results()$table$cluster_assigned)))
+        )
+      )
+  })
+
+  # Plot illustrative
+  output$acm_cah_illustrative_plot <- renderPlot({
+    req(illustrative_results())
+    illustrative_results()$plot()
+  })
+
+  # Return model for external use
+  return(acm_cah_model)
 }
-
-
-# ==============================================================================
-# WRAPPER FUNCTION - Création du modèle ACM-CAH
-# ==============================================================================
-
-create_acm_cah_model <- function(data, method = "dice", n_axes = 2, k = 3) {
-  #' Crée et ajuste un modèle ClustModalities
-  #'
-  #' @param data data.frame de variables qualitatives
-  #' @param method "dice" ou "acm"
-  #' @param n_axes nombre d'axes ACM (si method = "acm")
-  #' @param k nombre de clusters
-  #'
-  #' @return objet ClustModalities fitted
-
-  # Vérification dépendances
-  if (!requireNamespace("R6", quietly = TRUE)) {
-    stop("Le package R6 est requis. Installez-le avec: install.packages('R6')")
-  }
-  if (!requireNamespace("ade4", quietly = TRUE)) {
-    stop("Le package ade4 est requis. Installez-le avec: install.packages('ade4')")
-  }
-
-  # Source de la classe R6
-  if (!exists("ClustModalities")) {
-    source("/mnt/user-data/uploads/acm_cah.R", local = TRUE)
-  }
-
-  # Création du modèle
-  model <- ClustModalities$new(method = method, n_axes = n_axes)
-
-  # Fit
-  model$fit(X = data, k = k)
-
-  return(model)
-}
-
-
-# ==============================================================================
-# EXEMPLE D'UTILISATION DANS APP SHINY PRINCIPALE
-# ==============================================================================
-
-# Dans ui.R :
-# tabPanel("ACM-CAH", acm_cah_ui())
-
-# Dans server.R :
-#
-# # Modèle réactif
-# acm_cah_model <- eventReactive(input$run_acm_cah, {
-#   req(current_data())
-#
-#   # Sélectionner variables qualitatives
-#   quali_vars <- current_data()[, sapply(current_data(), is.factor), drop = FALSE]
-#
-#   if (ncol(quali_vars) == 0) {
-#     showNotification("No categorical variables found!", type = "error")
-#     return(NULL)
-#   }
-#
-#   withProgress(message = "Running ACM-CAH...", {
-#     setProgress(0.3, detail = "Initializing model...")
-#
-#     model <- create_acm_cah_model(
-#       data = quali_vars,
-#       method = input$acm_cah_method,
-#       n_axes = input$acm_cah_n_axes,
-#       k = input$acm_cah_k
-#     )
-#
-#     setProgress(1, detail = "Done!")
-#     model
-#   })
-# })
-#
-# # Appel du module
-# acm_cah_server(model_reactive = acm_cah_model)

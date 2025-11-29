@@ -1,8 +1,10 @@
 #' Variable Clustering R6 Class using VarClus
 #'
-#' An R6 class for performing variable clustering on numeric datasets.
-#' Implements hierarchical clustering via `Hmisc::varclus`, with support for
-#' elbow-based number of clusters selection, dendrogram plotting, and correlation heatmaps.
+#' VERSION AMÉLIORÉE - AJOUTS:
+#' 1. ✅ illustrative() déjà présent
+#' 2. ✅ predict() déjà présent
+#' 3. ✅ summary() amélioré avec affichage formaté
+#' 4. ✅ print() amélioré avec plus d'informations
 #'
 #' @import R6
 #' @import Hmisc
@@ -249,7 +251,7 @@ VarClus <- R6::R6Class(
         illust_scaled <- scale(illust_vars)
         cor_illu <- cor(illust_scaled, pca_active$x[,1:2])
         arrows(0, 0, cor_illu[,1]*arrows_scaling, cor_illu[,2]*arrows_scaling, col = "red", length = 0.1)
-        text(cor_illu[,1]*arrows_scaling*1.1, cor_illu[,2]*arrows_scaling*1.1, labels = rownames(cor_illu), col = "red")
+        text(cor_illu[,1]*arrows_scaling*1.1, cor_illu[,2]*arrows_scaling*1.1, labels = rownames(cor_illu), col = "red", font = 2)
       }
 
       return(list(table = res_table, plot = pca_plot))
@@ -257,51 +259,104 @@ VarClus <- R6::R6Class(
 
 
     # --------------------
-    # Print method
+    # Print method - AMÉLIORÉ
     # --------------------
     #' @description Print a concise summary of the VarClus model
     #' @param ... Additional arguments (ignored)
     #' @return Prints a concise summary of the clustering model
     print = function() {
-      cat("VarClus model\n")
-      cat("Similarity:", self$similarity, "\n")
+      cat("========================================\n")
+      cat("  VARCLUS - CLUSTERING DE VARIABLES\n")
+      cat("========================================\n")
+      cat(sprintf("Similarité: %s\n", self$similarity))
 
       if (!is.null(self$model)) {
-        cat("Model status       : Fitted\n")
-        cat("Number of variables:", length(self$model$hclust$order), "\n")
-        cat("Number of clusters:", self$n_clusters, "\n")
+        cat(sprintf("\nStatut: Modèle ajusté\n"))
+        cat(sprintf("\nDonnées:\n"))
+        cat(sprintf("  - Nombre de variables       : %d\n", length(self$model$hclust$order)))
+        cat(sprintf("  - Nombre de clusters        : %d\n", self$n_clusters))
+
+        if (!is.null(self$clusters)) {
+          tbl <- table(self$clusters$cluster)
+          cat(sprintf("\nTaille des clusters:\n"))
+          for (i in 1:length(tbl)) {
+            cat(sprintf("  - Cluster %d                 : %d variables\n", i, tbl[i]))
+          }
+        }
       } else {
-        cat("Model not yet fitted.\n")
+        cat("\nStatut: Modèle non ajusté. Utilisez fit() pour entraîner.\n")
       }
+
+      cat("========================================\n")
+      invisible(self)
     },
 
 
 
     # --------------------
-    # Summary method
+    # Summary method - AMÉLIORÉ
     # --------------------
     #' @description Return a detailed summary of the VarClus model results
-    #' @return A list with:
-    #' \describe{
-    #'   \item{text}{Text summary of the clustering model}
-    #'   \item{cluster_summary}{Cluster summary (number of variables, eigenvalues, variance explained)}
-    #'   \item{R2_summary}{R² summary for each variable}
-    summary = function() {
+    #' @return A list with detailed clustering information
+    summary = function(print_output = TRUE) {
       if (is.null(self$model)) stop("Model not yet fitted.")
-      cluster_results <- private$compute_cluster_pcs()
-      cluster_details <- private$compute_cluster_R2()
 
-      text_summary <- paste("VarClus Model Summary\n",
-                            "Similarity measure:", self$similarity, "\n",
-                            "Number of variables:", ncol(self$data), "\n",
-                            "Number of clusters:", self$n_clusters)
+      cluster_pcs <- private$compute_cluster_pcs()
+      cluster_r2 <- private$compute_cluster_R2()
 
-      list(
-        text = text_summary,
-        similarity_matrix = self$model$sim,
-        cluster_summary = cluster_results,
-        R2_summary = cluster_details
+      # Statistiques globales
+      global_stats <- data.frame(
+        metric = c("Nombre de variables", "Nombre de clusters", "Mesure de similarité"),
+        value = c(ncol(self$data), self$n_clusters, self$similarity),
+        stringsAsFactors = FALSE
       )
+
+      # Qualité moyenne par cluster
+      mean_r2_by_cluster <- tapply(
+        as.numeric(cluster_r2$Own_Cluster),
+        cluster_r2$Cluster,
+        mean
+      )
+
+      cluster_quality <- data.frame(
+        cluster = 1:self$n_clusters,
+        mean_R2_own = round(mean_r2_by_cluster, 4),
+        stringsAsFactors = FALSE
+      )
+
+      if (print_output) {
+        self$print()
+
+        cat("\n========================================\n")
+        cat("  STATISTIQUES GLOBALES\n")
+        cat("========================================\n")
+        print(global_stats, row.names = FALSE)
+
+        cat("\n========================================\n")
+        cat("  RÉSUMÉ PAR CLUSTER\n")
+        cat("========================================\n")
+        cat("Note: Variance expliquée = eigenvalue / n_variables\n\n")
+        print(cluster_pcs, row.names = FALSE)
+
+        cat("\n========================================\n")
+        cat("  QUALITÉ MOYENNE PAR CLUSTER\n")
+        cat("========================================\n")
+        print(cluster_quality, row.names = FALSE)
+
+        cat("\n========================================\n")
+        cat("  DÉTAILS R² PAR VARIABLE (top 30)\n")
+        cat("========================================\n")
+        cat("Note: 1-R² ratio doit être < 1 pour bonne assignation\n\n")
+        print(head(cluster_r2, 30), row.names = FALSE)
+      }
+
+      invisible(list(
+        global_stats = global_stats,
+        cluster_summary = cluster_pcs,
+        cluster_quality = cluster_quality,
+        R2_details = cluster_r2,
+        similarity_matrix = self$model$sim
+      ))
     },
 
     get_clusters_table = function() {

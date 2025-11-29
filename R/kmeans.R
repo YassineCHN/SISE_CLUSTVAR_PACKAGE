@@ -1,13 +1,10 @@
 # =============================================================================
 # KMeansVariablesQuant: K-means de variables quantitatives autour de composantes latentes
 #
-# VERSION FINALE CORRIGÉE - BUGS RÉSOLUS:
-# 1. Formule correcte pour lambda (somme des R²)
-# 2. Formule correcte pour variance_explained
-# 3. Correction du predict() (vérification dimensions)
-# 4. Vrai cercle de corrélation (variables, pas centres)
-# 5. Échelles ajustées pour les graphiques
-# 6. Visualisations séparées
+# VERSION AMÉLIORÉE - AJOUTS:
+# 1. ✅ Méthode illustrative() pour variables quantitatives illustratives
+# 2. ✅ summary() amélioré avec affichage complet
+# 3. ✅ print() amélioré avec plus d'informations
 #
 # PRINCIPE (d'après Ricco Rakotomalala / Vigneau-Qannari):
 #   - Centre d'un cluster = PC1 des variables du cluster (1ère composante principale)
@@ -159,7 +156,7 @@ KMeansVariablesQuant <- R6::R6Class(
     },
 
     # ===========================
-    # PREDICT - Variables illustratives
+    # PREDICT - Affectation de nouvelles variables
     # ===========================
     predict = function(X_new) {
       if (is.null(self$clusters) || is.null(self$centers)) {
@@ -169,16 +166,13 @@ KMeansVariablesQuant <- R6::R6Class(
       # Accepter n'importe quel nombre de variables (même 1 seule)
       X_new <- self$check_data(X_new, min_vars = 1)
 
-      # CORRECTION CRITIQUE: Vérifier le nombre d'INDIVIDUS, pas de variables
-      # X_new peut avoir n'importe quel nombre de variables (variables illustratives)
-      # Mais doit avoir le même nombre d'individus pour calculer les corrélations
+      # Vérifier le nombre d'INDIVIDUS (pas de variables)
       if (nrow(X_new) != nrow(self$data)) {
         stop(sprintf("X_new doit avoir %d individus (actuellement: %d)",
                      nrow(self$data), nrow(X_new)))
       }
 
-      # Standardiser les nouvelles variables (centrage et réduction)
-      # Chaque variable est standardisée indépendamment
+      # Standardiser les nouvelles variables
       Xn <- scale(X_new, center = TRUE, scale = TRUE)
       Xn <- as.matrix(Xn)
 
@@ -200,7 +194,7 @@ KMeansVariablesQuant <- R6::R6Class(
         stringsAsFactors = FALSE
       )
 
-      # Ajouter un avertissement si R² très faible
+      # Avertissement si R² très faible
       low_r2 <- result$r2_max < 0.30
       if (any(low_r2)) {
         warning(sprintf(
@@ -214,9 +208,110 @@ KMeansVariablesQuant <- R6::R6Class(
     },
 
     # ===========================
-    # SUMMARY - Résumé des résultats
+    # ILLUSTRATIVE - Variables illustratives (analyse complète)
     # ===========================
-    summary = function(print_summary = FALSE) {
+    illustrative = function(X_illust, plot = TRUE) {
+      if (is.null(self$clusters) || is.null(self$centers)) {
+        stop("fit() doit être exécuté avant illustrative()")
+      }
+
+      # Validation
+      X_illust <- self$check_data(X_illust, min_vars = 1)
+
+      if (nrow(X_illust) != nrow(self$data)) {
+        stop(sprintf("X_illust doit avoir %d individus (actuellement: %d)",
+                     nrow(self$data), nrow(X_illust)))
+      }
+
+      # Standardiser les variables illustratives
+      Xi <- scale(X_illust, center = TRUE, scale = TRUE)
+      Xi <- as.matrix(Xi)
+
+      # Calculer R² avec TOUS les clusters (composantes latentes)
+      cor_mat <- cor(Xi, self$centers)
+      cor_mat[is.na(cor_mat)] <- 0
+      r2_mat <- cor_mat^2
+
+      # Pour chaque variable illustrative
+      K <- self$k
+      var_names <- colnames(X_illust)
+      p_illust <- ncol(X_illust)
+
+      # Cluster assigné (R² max)
+      cl_assigned <- apply(r2_mat, 1, which.max)
+      r2_own <- apply(r2_mat, 1, max)
+
+      # R² avec le 2ème cluster le plus proche
+      r2_next <- vapply(seq_len(p_illust), function(i) {
+        k_i <- cl_assigned[i]
+        if (K == 1) return(0)
+        max(r2_mat[i, -k_i, drop = TRUE])
+      }, numeric(1))
+
+      # Ratio (1-R²own)/(1-R²next)
+      ratio <- (1 - r2_own) / pmax(1 - r2_next, .Machine$double.eps)
+
+      # Table détaillée
+      illust_table <- data.frame(
+        variable = var_names,
+        cluster = cl_assigned,
+        R2_own_pct = round(r2_own * 100, 2),
+        R2_next_pct = round(r2_next * 100, 2),
+        ratio = round(ratio, 3),
+        stringsAsFactors = FALSE
+      )
+      illust_table <- illust_table[order(illust_table$cluster, -illust_table$R2_own_pct), ]
+
+      # Matrice R² complète (toutes variables x tous clusters)
+      r2_all <- as.data.frame(round(r2_mat * 100, 2))
+      colnames(r2_all) <- paste0("Cluster_", 1:K)
+      rownames(r2_all) <- var_names
+
+      # Fonction de visualisation : Barplot des corrélations
+      plot_func <- function() {
+        par(mfrow = c(1, min(2, p_illust)), mar = c(5, 4, 4, 2))
+
+        for (i in 1:min(p_illust, 4)) {  # Max 4 variables pour lisibilité
+          var <- var_names[i]
+          r2_var <- r2_mat[i, ]
+
+          barplot(
+            r2_var * 100,
+            names.arg = paste0("C", 1:K),
+            main = paste("Variable illustrative:", var),
+            ylab = "R² (%)",
+            col = ifelse(seq_len(K) == cl_assigned[i], "steelblue", "grey80"),
+            border = "black",
+            ylim = c(0, 100)
+          )
+          abline(h = 30, lty = 2, col = "red")
+          text(x = 1, y = 95, labels = sprintf("Cluster %d (R²=%.1f%%)",
+                                               cl_assigned[i], r2_own[i]*100),
+               pos = 4, col = "steelblue", font = 2)
+        }
+
+        par(mfrow = c(1, 1))
+      }
+
+      # Résultat
+      result <- list(
+        table = illust_table,
+        r2_all_clusters = r2_all,
+        plot = plot_func
+      )
+
+      # Afficher le plot si demandé
+      if (plot && p_illust > 0) {
+        plot_func()
+      }
+
+      invisible(result)
+    },
+
+    # ===========================
+    # SUMMARY - Résumé complet amélioré
+    # ===========================
+    summary = function(print_output = TRUE) {
       if (is.null(self$clusters)) {
         stop("fit() doit être exécuté avant summary()")
       }
@@ -243,7 +338,7 @@ KMeansVariablesQuant <- R6::R6Class(
       # Ratio (1-R²own)/(1-R²next) : doit être << 1
       ratio <- (1 - own) / pmax(1 - next_r2, .Machine$double.eps)
 
-      clust_members <- data.frame(
+      cluster_members <- data.frame(
         cluster = self$clusters,
         variable = var_names,
         R2_own_pct = round(own * 100, 2),
@@ -251,7 +346,7 @@ KMeansVariablesQuant <- R6::R6Class(
         ratio = round(ratio, 3),
         stringsAsFactors = FALSE
       )
-      clust_members <- clust_members[order(clust_members$cluster, -clust_members$R2_own_pct), ]
+      cluster_members <- cluster_members[order(cluster_members$cluster, -cluster_members$R2_own_pct), ]
 
       # =============================
       # 2. Cluster summary
@@ -262,13 +357,13 @@ KMeansVariablesQuant <- R6::R6Class(
       # Proportion de variance expliquée par chaque cluster
       prop <- lambdas / sum(lambdas)
 
-      # CORRECTION: Variance expliquée = λ_k / p_k (d'après Ricco p.19)
+      # Variance expliquée = λ_k / p_k (d'après Ricco p.19)
       var_explained <- (lambdas / pmax(cl_sizes, 1)) * 100
 
-      clust_summary <- data.frame(
+      cluster_summary <- data.frame(
         cluster = 1:K,
-        n_variables = cl_sizes,             # ✅ Renommé
-        lambda = round(lambdas, 4),         # ✅ Renommé
+        n_variables = cl_sizes,
+        lambda = round(lambdas, 4),
         variance_explained_pct = round(var_explained, 2),
         prop_inertia = round(prop, 4),
         stringsAsFactors = FALSE
@@ -281,23 +376,62 @@ KMeansVariablesQuant <- R6::R6Class(
       colnames(cor_latent) <- rownames(cor_latent) <- paste0("Cluster_", 1:K)
 
       # =============================
+      # 4. Qualité globale du clustering
+      # =============================
+      # Proportion de variables bien assignées (ratio < 1)
+      well_assigned <- sum(ratio < 1) / length(ratio) * 100
+
+      # R² moyen par cluster
+      mean_r2_by_cluster <- tapply(own, self$clusters, mean)
+
+      global_quality <- data.frame(
+        metric = c("Inertie totale", "R² moyen global", "% variables bien assignées (ratio<1)"),
+        value = c(
+          round(self$inertia_total, 4),
+          round(mean(own) * 100, 2),
+          round(well_assigned, 2)
+        ),
+        stringsAsFactors = FALSE
+      )
+
+      # =============================
       # Affichage optionnel
       # =============================
-      if (print_summary) {
+      if (print_output) {
         self$print()
-        cat("\n=== CLUSTER SUMMARY ===\n")
-        print(clust_summary, row.names = FALSE)
-        cat("\n=== CLUSTER MEMBERS (top variables) ===\n")
-        print(head(clust_members, 15), row.names = FALSE)
-        cat("\n=== CORRELATIONS ENTRE COMPOSANTES LATENTES ===\n")
+
+        cat("\n========================================\n")
+        cat("  QUALITÉ GLOBALE DU CLUSTERING\n")
+        cat("========================================\n")
+        print(global_quality, row.names = FALSE)
+
+        cat("\n========================================\n")
+        cat("  RÉSUMÉ PAR CLUSTER\n")
+        cat("========================================\n")
+        print(cluster_summary, row.names = FALSE)
+
+        cat("\n========================================\n")
+        cat("  MEMBRES DES CLUSTERS (top 20)\n")
+        cat("========================================\n")
+        print(head(cluster_members, 20), row.names = FALSE)
+
+        cat("\n========================================\n")
+        cat("  CORRÉLATIONS ENTRE COMPOSANTES LATENTES\n")
+        cat("========================================\n")
         print(round(cor_latent, 3))
+
+        cat("\n========================================\n")
+        cat("  R² MOYEN PAR CLUSTER\n")
+        cat("========================================\n")
+        print(round(mean_r2_by_cluster * 100, 2))
       }
 
       invisible(list(
-        cluster_summary = clust_summary,     # ✅ "cluster_summary" (pas "clust_summary")
-        cluster_members = clust_members,     # ✅ "cluster_members" (déjà corrigé)
+        global_quality = global_quality,
+        cluster_summary = cluster_summary,
+        cluster_members = cluster_members,
         cor_latent = round(cor_latent, 4),
-        inertia_total = self$inertia_total,
+        mean_r2_by_cluster = round(mean_r2_by_cluster, 4),
         r2_matrix = as.data.frame(round(self$r2_matrix, 4))
       ))
     },
@@ -310,267 +444,225 @@ KMeansVariablesQuant <- R6::R6Class(
         stop("fit() doit être exécuté une fois avant compute_elbow()")
       }
 
-      p <- ncol(self$X_scaled)
-      k_range <- k_range[k_range >= 2 & k_range <= p]
+      X <- self$X_scaled
+      n <- nrow(X)
+      p <- ncol(X)
 
-      if (length(k_range) < 2) {
-        stop("k_range invalide: doit contenir au moins 2 valeurs entre 2 et p")
-      }
-
-      message(sprintf("Calcul de l'elbow pour k in [%d, %d]...", min(k_range), max(k_range)))
-
-      inertias <- numeric(length(k_range))
-      for (i in seq_along(k_range)) {
-        K <- k_range[i]
-        # Utiliser plusieurs runs pour chaque k
-        best_inertia <- -Inf
-        for (trial in 1:5) {
-          if (!is.null(self$seed)) set.seed(self$seed + i * 1000 + trial)
-          res <- private$single_run(self$X_scaled, K, self$max_iter, self$tol)
-          if (res$inertia_total > best_inertia) {
-            best_inertia <- res$inertia_total
-          }
-        }
-        inertias[i] <- best_inertia
-      }
-
-      data.frame(k = k_range, inertia = round(inertias, 4))
-    },
-
-    plot_elbow = function(k_range = 2:10) {
-      df <- self$compute_elbow(k_range)
-
-      graphics::plot(df$k, df$inertia, type = "b", pch = 19,
-                     xlab = "Nombre de clusters k",
-                     ylab = "Inertie totale (somme des λk)",
-                     main = "Courbe elbow - K-means de variables",
-                     col = "steelblue", lwd = 2,
-                     ylim = range(df$inertia) * c(0.95, 1.05))
-
-      # Marquer le k actuel si présent
-      if (!is.null(self$clusters) && self$k %in% df$k) {
-        graphics::points(self$k, df$inertia[df$k == self$k],
-                         pch = 19, cex = 2, col = "red")
-        graphics::abline(v = self$k, lty = 2, col = "red")
-        graphics::text(self$k, df$inertia[df$k == self$k],
-                       labels = paste0("k=", self$k),
-                       pos = 4, col = "red", font = 2)
-      }
-
-      graphics::grid()
-      invisible(df)
-    },
-
-    # ===========================
-    # Visualisations
-    # ===========================
-
-    # Cercle de corrélation avec les variables (corrélations avec PC1 et PC2 globaux)
-    plot_correlation_circle = function() {
-      if (is.null(self$X_scaled) || is.null(self$clusters)) {
-        stop("fit() doit être exécuté avant plot_correlation_circle()")
-      }
-
-      # ACP globale sur toutes les variables
-      pca <- prcomp(self$X_scaled, center = TRUE, scale. = FALSE)
-
-      # CORRECTION CRITIQUE: Calculer les VRAIES CORRÉLATIONS
-      # cor(variables, composantes principales) au lieu de pca$rotation
-      var_coords <- cor(self$X_scaled, pca$x[, 1:2])
-      # var_coords[i, j] = corrélation entre variable i et composante principale j
-
-      # Couleurs par cluster
-      col <- rainbow(self$k)[self$clusters]
-
-      # Calculer % variance expliquée
-      var_expl <- summary(pca)$importance[2, 1:2] * 100
-
-      # Échelles: cercle unité
-      plot(var_coords[, 1], var_coords[, 2],
-           xlim = c(-1, 1), ylim = c(-1, 1),
-           xlab = sprintf("PC1 (%.1f%%)", var_expl[1]),
-           ylab = sprintf("PC2 (%.1f%%)", var_expl[2]),
-           main = "Cercle des corrélations (ACP globale)",
-           type = "n",
-           asp = 1)
-
-      # Cercle unité
-      t <- seq(0, 2*pi, length = 200)
-      lines(cos(t), sin(t), col = "gray70", lty = 2)
-
-      # Axes
-      abline(h = 0, v = 0, lty = 3, col = "gray")
-
-      # Flèches vers les variables
-      arrows(0, 0, var_coords[, 1], var_coords[, 2],
-             length = 0.1, col = col, lwd = 2)
-
-      # Labels des variables
-      text(var_coords[, 1], var_coords[, 2],
-           labels = rownames(var_coords),
-           pos = 3, cex = 0.8, col = col, font = 2)
-
-      # Légende
-      legend("topright",
-             legend = paste("Cluster", 1:self$k),
-             col = rainbow(self$k),
-             lwd = 2,
-             cex = 0.7,
-             bg = "white")
-    },
-
-    # Projection des variables sur le premier plan factoriel global
-    plot_variable_map = function() {
-      if (is.null(self$X_scaled) || is.null(self$clusters)) {
-        stop("fit() doit être exécuté avant plot_variable_map()")
-      }
-
-      # ACP globale sur toutes les variables
-      pca <- prcomp(self$X_scaled, center = TRUE, scale. = FALSE)
-
-      # Coordonnées des variables (loadings)
-      scores <- pca$rotation[, 1:2]
-      col <- rainbow(self$k)[self$clusters]
-
-      # Calculer % variance expliquée
-      var_expl <- summary(pca)$importance[2, 1:2] * 100
-
-      # CORRECTION: Échelles ajustées automatiquement
-      xlim <- range(scores[,1])
-      ylim <- range(scores[,2])
-      xlim <- xlim + c(-1, 1) * diff(xlim) * 0.15
-      ylim <- ylim + c(-1, 1) * diff(ylim) * 0.15
-
-      plot(scores[, 1], scores[, 2],
-           col = col, pch = 19, cex = 1.5,
-           xlab = sprintf("PC1 (%.1f%%)", var_expl[1]),
-           ylab = sprintf("PC2 (%.1f%%)", var_expl[2]),
-           main = "Projection des variables (plan factoriel global)",
-           xlim = xlim,
-           ylim = ylim)
-
-      text(scores[, 1], scores[, 2],
-           labels = colnames(self$X_scaled),
-           pos = 3, cex = 0.8, col = col)
-
-      abline(h = 0, v = 0, lty = 3, col = "gray")
-
-      # Légende
-      legend("topright",
-             legend = paste("Cluster", 1:self$k),
-             col = rainbow(self$k),
-             pch = 19,
-             cex = 0.8,
-             bg = "white")
-
-      # Note explicative
-      total_var <- sum(var_expl)
-      mtext(sprintf("Note: Projection 2D (%.1f%% variance) - Points proches ≠ même cluster", total_var),
-            side = 1, line = 4, cex = 0.7, col = "gray40")
-    },
-
-    # Projection des centres latents sur le plan factoriel global
-    plot_center_map = function() {
-      if (is.null(self$centers) || is.null(self$clusters)) {
-        stop("fit() doit être exécuté avant plot_center_map()")
-      }
-
-      # ACP globale
-      pca <- prcomp(self$X_scaled, center = TRUE, scale. = FALSE)
-
-      # Coordonnées des centres par corrélation
-      center_coord <- cor(self$centers, pca$x)[, 1:2]
-
-      col <- rainbow(self$k)
-
-      plot(center_coord[, 1], center_coord[, 2],
-           col = col, pch = 15, cex = 3,
-           xlab = "Corrélation avec PC1",
-           ylab = "Corrélation avec PC2",
-           main = "Projection des centres latents (PC1_k)",
-           xlim = c(-1, 1), ylim = c(-1, 1),
-           asp = 1)
-
-      # Cercle unité
-      t <- seq(0, 2*pi, length = 200)
-      lines(cos(t), sin(t), col = "gray70", lty = 2)
-
-      text(center_coord[, 1], center_coord[, 2],
-           labels = paste0("C", 1:self$k),
-           pos = 3, col = col, font = 2)
-
-      abline(h = 0, v = 0, lty = 3, col = "gray")
-    },
-    plot_cluster_centers = function() {
-      self$plot_center_map()
-    },
-    #' Elbow method to determine optimal number of clusters
-    #'
-    #' @param k_range Range of k values to test (default: 2:10)
-    #' @param n_init Number of initializations per k (default: 20)
-    #' @param plot Logical, whether to display the plot (default: TRUE)
-    #' @return List with optimal_k, results data.frame, and plot function
-    #' @export
-    elbow = function(k_range = 2:10, n_init = 20, plot = TRUE) {
-      if (is.null(self$data)) {
-        stop("No data available. Use fit() first or provide data to elbow.")
-      }
-
-      # Calculer les inerties pour chaque k
-      p <- ncol(self$data)
-      k_range <- k_range[k_range >= 2 & k_range <= p]
-
-      if (length(k_range) < 2) {
-        stop("k_range invalide: doit contenir au moins 2 valeurs entre 2 et p")
-      }
+      # Sauvegarder l'état actuel
+      k_orig <- self$k
+      seed_orig <- self$seed
 
       message(sprintf("Calcul de l'elbow pour k in [%d, %d]...", min(k_range), max(k_range)))
 
-      # Standardiser les données une fois
-      X <- scale(self$data)
-      X <- as.matrix(X)
-
-      inertias <- numeric(length(k_range))
-
-      for (i in seq_along(k_range)) {
-        K <- k_range[i]
-        best_inertia <- -Inf
-
-        # Plusieurs initialisations pour chaque k
-        for (trial in 1:n_init) {
-          if (!is.null(self$seed)) {
-            set.seed(self$seed + i * 1000 + trial)
-          }
-
-          # Utiliser la méthode privée single_run
-          res <- private$single_run(X, K, self$max_iter, self$tol)
-
-          if (res$inertia_total > best_inertia) {
-            best_inertia <- res$inertia_total
-          }
-        }
-
-        inertias[i] <- best_inertia
-      }
-
-      # Créer le data.frame de résultats
       results <- data.frame(
-        k = k_range,
-        inertia = round(inertias, 4),
+        k = integer(),
+        inertia = numeric(),
         stringsAsFactors = FALSE
       )
 
-      # Détecter k optimal (méthode du coude simple)
-      if (length(k_range) >= 3) {
-        # Calculer les variations
-        deltas <- diff(inertias)
-        delta_deltas <- diff(deltas)
+      for (k_test in k_range) {
+        if (k_test > p) {
+          warning(sprintf("k=%d > p=%d, ignoré", k_test, p))
+          next
+        }
 
-        # Le coude = changement de pente maximal
-        optimal_idx <- which.max(abs(delta_deltas)) + 1
-        optimal_k <- k_range[optimal_idx]
-      } else {
-        optimal_k <- k_range[1]
+        # Créer une instance temporaire
+        temp_km <- KMeansVariablesQuant$new(
+          k = k_test,
+          max_iter = self$max_iter,
+          n_init = self$n_init,
+          tol = self$tol,
+          seed = self$seed
+        )
+
+        # Fit silencieux
+        suppressMessages(temp_km$fit(as.data.frame(X)))
+
+        results <- rbind(results, data.frame(
+          k = k_test,
+          inertia = temp_km$inertia_total
+        ))
+      }
+
+      # Restaurer k original
+      self$k <- k_orig
+
+      results
+    },
+
+    plot_elbow = function(k_range = 2:10) {
+      results <- self$compute_elbow(k_range)
+
+      plot(results$k, results$inertia,
+           type = "b", pch = 19, col = "steelblue", lwd = 2,
+           xlab = "Nombre de clusters (k)",
+           ylab = "Inertie totale",
+           main = "Méthode du Coude - K-means de Variables")
+      grid()
+
+      invisible(results)
+    },
+
+    # ===========================
+    # CORRELATION CIRCLE - Cercle des corrélations
+    # ===========================
+    plot_correlation_circle = function(dims = c(1, 2)) {
+      if (is.null(self$clusters)) {
+        stop("fit() doit être exécuté avant plot_correlation_circle()")
+      }
+
+      if (self$k < max(dims)) {
+        stop(sprintf("dims[%d]=%d mais k=%d", which.max(dims), max(dims), self$k))
+      }
+
+      # Corrélations entre variables et composantes latentes
+      cor_mat <- cor(self$X_scaled, self$centers[, dims])
+
+      # Cercle
+      theta <- seq(0, 2*pi, length.out = 100)
+      circle_x <- cos(theta)
+      circle_y <- sin(theta)
+
+      # Calculer % de variance expliquée par chaque composante (approx)
+      # On utilise les corrélations moyennes comme proxy
+      r2_dim1 <- mean(cor_mat[, 1]^2) * 100
+      r2_dim2 <- mean(cor_mat[, 2]^2) * 100
+
+      plot(circle_x, circle_y, type = "l", col = "grey70",
+           xlim = c(-1.2, 1.2), ylim = c(-1.2, 1.2),
+           asp = 1,
+           xlab = sprintf("Composante latente %d (R²~%.1f%%)", dims[1], r2_dim1),
+           ylab = sprintf("Composante latente %d (R²~%.1f%%)", dims[2], r2_dim2),
+           main = "Cercle des corrélations - Variables actives")
+
+      abline(h = 0, v = 0, lty = 3)
+
+      # Flèches des variables
+      arrows(0, 0, cor_mat[, 1], cor_mat[, 2],
+             length = 0.1, col = "steelblue", lwd = 1.5)
+
+      # Texte des variables (colorées par cluster)
+      cols <- rainbow(self$k)[self$clusters]
+      text(cor_mat[, 1], cor_mat[, 2],
+           labels = colnames(self$X_scaled),
+           pos = 3, cex = 0.7, col = cols)
+
+      invisible(cor_mat)
+    },
+
+    # ===========================
+    # BIPLOT - Variables sur axes factoriels
+    # ===========================
+    plot_biplot = function(dims = c(1, 2)) {
+      if (is.null(self$clusters)) {
+        stop("fit() doit être exécuté avant plot_biplot()")
+      }
+
+      if (self$k < max(dims)) {
+        stop(sprintf("dims[%d]=%d mais k=%d", which.max(dims), max(dims), self$k))
+      }
+
+      # ACP des variables (transposée de X)
+      X_t <- t(self$X_scaled)
+      pca <- prcomp(X_t, center = TRUE, scale. = FALSE)
+
+      # Coordonnées des variables sur les axes factoriels
+      coords <- pca$x[, dims]
+
+      # % variance expliquée
+      var_expl <- summary(pca)$importance[2, dims] * 100
+
+      plot(coords[, 1], coords[, 2],
+           type = "n",
+           xlab = sprintf("PC%d (%.1f%%)", dims[1], var_expl[1]),
+           ylab = sprintf("PC%d (%.1f%%)", dims[2], var_expl[2]),
+           main = "Biplot - Variables dans l'espace factoriel")
+
+      abline(h = 0, v = 0, lty = 3, col = "grey70")
+
+      # Points colorés par cluster
+      cols <- rainbow(self$k)[self$clusters]
+      points(coords[, 1], coords[, 2], pch = 19, col = cols, cex = 1.2)
+      text(coords[, 1], coords[, 2],
+           labels = colnames(self$X_scaled),
+           pos = 3, cex = 0.7, col = cols)
+
+      # Légende
+      legend("topright", legend = paste("Cluster", 1:self$k),
+             col = rainbow(self$k), pch = 19, cex = 0.8)
+
+      invisible(coords)
+    },
+
+    # ===========================
+    # ELBOW with AUTO-DETECTION
+    # ===========================
+    elbow = function(k_range = 2:10, plot = TRUE) {
+      if (is.null(self$X_scaled)) {
+        stop("fit() doit être exécuté une fois avant elbow()")
+      }
+
+      X <- self$X_scaled
+      n <- nrow(X)
+      p <- ncol(X)
+
+      # Sauvegarder l'état actuel
+      k_orig <- self$k
+      seed_orig <- self$seed
+
+      message(sprintf("Calcul de l'elbow pour k in [%d, %d]...", min(k_range), max(k_range)))
+
+      results <- data.frame(
+        k = integer(),
+        inertia = numeric(),
+        gain = numeric(),
+        stringsAsFactors = FALSE
+      )
+
+      prev_inertia <- NULL
+
+      for (k_test in k_range) {
+        if (k_test > p) {
+          warning(sprintf("k=%d > p=%d, ignoré", k_test, p))
+          next
+        }
+
+        # Créer une instance temporaire
+        temp_km <- KMeansVariablesQuant$new(
+          k = k_test,
+          max_iter = self$max_iter,
+          n_init = self$n_init,
+          tol = self$tol,
+          seed = self$seed
+        )
+
+        # Fit silencieux
+        suppressMessages(temp_km$fit(as.data.frame(X)))
+
+        # Calculer le gain marginal
+        gain <- if (!is.null(prev_inertia)) {
+          temp_km$inertia_total - prev_inertia
+        } else {
+          NA
+        }
+
+        results <- rbind(results, data.frame(
+          k = k_test,
+          inertia = temp_km$inertia_total,
+          gain = gain
+        ))
+
+        prev_inertia <- temp_km$inertia_total
+      }
+
+      # Restaurer k original
+      self$k <- k_orig
+
+      # Détection automatique du coude (gain marginal maximal)
+      optimal_k <- results$k[which.max(results$gain[-1])] + 1  # +1 car gain décalé
+
+      if (is.na(optimal_k) || optimal_k < min(k_range)) {
+        optimal_k <- results$k[which.max(results$inertia)]
       }
 
       # Fonction de plot
@@ -619,29 +711,46 @@ KMeansVariablesQuant <- R6::R6Class(
     },
 
     # ===========================
-    # PRINT
+    # PRINT - Affichage amélioré
     # ===========================
     print = function(...) {
-      cat("=== K-Means de Variables Quantitatives ===\n")
-      cat(sprintf("k = %d | max_iter = %d | n_init = %d\n",
-                  self$k, self$max_iter, self$n_init))
+      cat("========================================\n")
+      cat("  K-MEANS DE VARIABLES QUANTITATIVES\n")
+      cat("========================================\n")
+      cat(sprintf("Paramètres:\n"))
+      cat(sprintf("  - Nombre de clusters (k)    : %d\n", self$k))
+      cat(sprintf("  - Itérations max par run    : %d\n", self$max_iter))
+      cat(sprintf("  - Nombre d'initialisations  : %d\n", self$n_init))
+      cat(sprintf("  - Tolérance convergence     : %.1e\n", self$tol))
+
+      if (!is.null(self$seed)) {
+        cat(sprintf("  - Graine aléatoire          : %d\n", self$seed))
+      }
 
       if (!is.null(self$data)) {
-        cat(sprintf("Données: %d individus x %d variables\n",
-                    nrow(self$data), ncol(self$data)))
+        cat(sprintf("\nDonnées:\n"))
+        cat(sprintf("  - Individus                 : %d\n", nrow(self$data)))
+        cat(sprintf("  - Variables                 : %d\n", ncol(self$data)))
       }
 
       if (!is.null(self$clusters)) {
-        cat(sprintf("Inertie totale: %.4f | Itérations: %d\n",
-                    self$inertia_total, self$n_iter))
-        cat("Taille des clusters:\n")
-        print(table(self$clusters))
+        cat(sprintf("\nRésultats:\n"))
+        cat(sprintf("  - Inertie totale            : %.4f\n", self$inertia_total))
+        cat(sprintf("  - Itérations (meilleur run) : %d\n", self$n_iter))
+        cat(sprintf("\nTaille des clusters:\n"))
+        tbl <- table(self$clusters)
+        for (i in 1:length(tbl)) {
+          cat(sprintf("  - Cluster %d                 : %d variables\n", i, tbl[i]))
+        }
       } else {
-        cat("Modèle non ajusté. Utilisez fit() pour entraîner.\n")
+        cat("\nStatut: Modèle non ajusté. Utilisez fit() pour entraîner.\n")
       }
+
+      cat("========================================\n")
 
       invisible(self)
     },
+
     get_clusters_table = function() {
       if (is.null(self$clusters))
         stop("fit() doit être exécuté avant get_clusters_table()")
@@ -759,8 +868,7 @@ KMeansVariablesQuant <- R6::R6Class(
           }
         }
 
-        # CORRECTION: Calculer l'inertie comme SOMME des R²
-        # λ_k = Σ r²(X_j, Z_k) pour j ∈ cluster_k
+        # Calculer l'inertie comme SOMME des R²
         lambdas <- numeric(K)
         for (k in 1:K) {
           idx <- which(clusters_new == k)
@@ -798,7 +906,7 @@ KMeansVariablesQuant <- R6::R6Class(
       cor_mat[is.na(cor_mat)] <- 0
       r2_mat <- cor_mat^2
 
-      # CORRECTION: Lambda final = somme des R² dans chaque cluster
+      # Lambda final = somme des R² dans chaque cluster
       lambdas <- numeric(K)
       for (k in 1:K) {
         idx <- which(clusters == k)
