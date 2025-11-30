@@ -382,8 +382,10 @@ acm_cah_server <- function(engine_reactive, input = NULL, output = NULL, session
         icon("info-circle", class = "fa-3x", style = "color: #cbd5e0;"),
         br(), br(),
         h5("No illustrative variables selected", style = "color: #4a5568;"),
-        p("Select qualitative illustrative variables in the sidebar to see their projection onto the clusters.",
-          style = "font-size: 14px;")
+        p(
+          "Select qualitative illustrative variables in the sidebar to see their projection onto the clusters.",
+          style = "font-size: 14px;"
+        )
       )
     } else {
       tagList(
@@ -391,26 +393,31 @@ acm_cah_server <- function(engine_reactive, input = NULL, output = NULL, session
           column(
             width = 12,
             div(
-              style = "background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
-              h5("📊 Illustrative Modalities - Distance to Clusters", style = "color: #2d3748; font-weight: 600;"),
-              p(if (method_value() == "dice") {
-                "Average Dice² distance to cluster members (lower = closer)"
-              } else {
-                "Euclidean distance to cluster barycenters in MCA space (lower = closer)"
-              }, style = "color: #718096; font-size: 13px; margin-bottom: 15px;"),
+              style = "background: white; padding: 15px; border-radius: 8px;
+                     box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
+              h5("📊 Illustrative Modalities - Distance to Clusters",
+                 style = "color: #2d3748; font-weight: 600;"),
+              p(
+                if (method_value() == "dice") {
+                  "Average Dice² distance to cluster members (lower = closer)"
+                } else {
+                  "Euclidean distance to cluster barycenters in MCA space (lower = closer)"
+                },
+                style = "color: #718096; font-size: 13px; margin-bottom: 15px;"
+              ),
               DTOutput("acm_cah_illustrative_table")
             )
           )
         ),
-
         br(),
-
         fluidRow(
           column(
             width = 12,
             div(
-              style = "background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
-              h5("📈 Distance Visualization", style = "color: #2d3748; font-weight: 600;"),
+              style = "background: white; padding: 15px; border-radius: 8px;
+                     box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
+              h5("📈 Distance Visualization",
+                 style = "color: #2d3748; font-weight: 600;"),
               plotOutput("acm_cah_illustrative_plot", height = "500px")
             )
           )
@@ -448,7 +455,7 @@ acm_cah_server <- function(engine_reactive, input = NULL, output = NULL, session
     illustrative_results()$plot()
   })
 
-  # ========== ILLUSTRATIVE NUMERIC (NOUVEAU!) ==========
+  # ========== ILLUSTRATIVE NUMERIC (retour à la version simple & sûre) ==========
 
   illustrative_numeric_results <- reactive({
     req(acm_cah_model())
@@ -456,45 +463,28 @@ acm_cah_server <- function(engine_reactive, input = NULL, output = NULL, session
 
     illust_num <- illustrative_numeric_data()
 
-    if (!is.null(illust_num) && ncol(illust_num) > 0) {
-      tryCatch({
-        acm_cah_model()$illustrative_numeric(illust_num, plot = FALSE)
-      }, error = function(e) {
-        showNotification(paste("Error:", e$message), type = "error", duration = 10)
-        NULL
-      })
-    } else {
-      NULL
+    # Aucun jeu de données quantitatif illustratif
+    if (is.null(illust_num) || ncol(illust_num) == 0) {
+      return(NULL)
     }
-  })
 
-  output$acm_cah_illustrative_numeric_content <- renderUI({
-    if (method_value() != "acm") {
-      div(
-        style = "text-align: center; padding: 40px; color: #718096;",
-        icon("info-circle", class = "fa-3x", style = "color: #cbd5e0;"),
-        br(), br(),
-        h5("Only available for ACM method", style = "color: #4a5568;")
+    tryCatch({
+      res <- acm_cah_model()$illustrative_numeric(illust_num, plot = FALSE)
+
+      # Sécurité : si pas de rownames → on met les noms des variables
+      if (is.null(rownames(res))) {
+        rownames(res) <- colnames(illust_num)
+      }
+
+      res
+    }, error = function(e) {
+      showNotification(
+        paste("Error in illustrative_numeric:", e$message),
+        type = "error",
+        duration = 10
       )
-    } else if (is.null(illustrative_numeric_results())) {
-      div(
-        style = "text-align: center; padding: 40px; color: #718096;",
-        icon("info-circle", class = "fa-3x", style = "color: #cbd5e0;"),
-        br(), br(),
-        h5("No quantitative illustrative variables", style = "color: #4a5568;")
-      )
-    } else {
-      fluidRow(
-        column(
-          width = 12,
-          div(
-            style = "background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
-            h5("📈 Correlation Circle", style = "color: #2d3748; font-weight: 600;"),
-            plotOutput("acm_cah_illustrative_numeric_plot", height = "500px")
-          )
-        )
-      )
-    }
+      NULL
+    })
   })
 
   output$acm_cah_illustrative_numeric_plot <- renderPlot({
@@ -511,12 +501,44 @@ acm_cah_server <- function(engine_reactive, input = NULL, output = NULL, session
          asp = 1,
          xlab = "Correlation with Dim 1",
          ylab = "Correlation with Dim 2",
-         main = "Cercle des corrélations — illustratives quantitatives")
+         main = "Correlation Circle — Quantitative illustrative variables")
+
     abline(h = 0, v = 0, lty = 3, col = "grey70")
 
-    points(cors$cor.Dim1, cors$cor.Dim2, pch = 19)
-    text(cors$cor.Dim1, cors$cor.Dim2,
-         labels = rownames(cors), pos = 3, cex = 0.8)
+    # Flèches depuis l'origine vers chaque variable
+    arrows(0, 0,
+           cors$cor.Dim1,
+           cors$cor.Dim2,
+           length = 0.08, lwd = 1.5)
+
+    # Étoiles aux extrémités
+    points(cors$cor.Dim1, cors$cor.Dim2,
+           pch = 8, cex = 1.3)
+
+    # Labels légèrement décalés
+    text(cors$cor.Dim1 * 1.05,
+         cors$cor.Dim2 * 1.05,
+         labels = rownames(cors),
+         cex = 0.8)
+  })
+
+  output$acm_cah_illustrative_numeric_table <- renderDT({
+    cors <- illustrative_numeric_results()
+    req(cors)
+
+    df <- cbind(
+      Variable = rownames(cors),
+      cors,
+      AbsCorr = sqrt(cors$cor.Dim1^2 + cors$cor.Dim2^2)
+    )
+    df <- df[order(-df$AbsCorr),]
+
+    datatable(
+      df,
+      rownames = FALSE,
+      options = list(pageLength = 10, scrollX = TRUE),
+      class = "cell-border stripe"
+    )
   })
 
   # Return model for external use

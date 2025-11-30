@@ -249,7 +249,11 @@ ClustModalities <- R6::R6Class(
       kk <- if (!is.null(k)) k else self$k
 
       if (!is.null(kk) && !is.null(self$mod_clusters)) {
-        cols <- rainbow(kk)[self$mod_clusters]
+        dark_cols <- grDevices::colorRampPalette(c("#1f77b4","#ff7f0e","#2ca02c",
+                                                   "#d62728","#9467bd","#8c564b",
+                                                   "#e377c2","#7f7f7f","#bcbd22",
+                                                   "#17becf"))(kk)
+        cols <- dark_cols[self$mod_clusters]
       } else {
         cols <- "black"
       }
@@ -257,13 +261,34 @@ ClustModalities <- R6::R6Class(
       eig <- self$eig_raw[dims]
       perc <- 100 * eig / sum(self$eig_raw)
 
-      plot(coords[,1], coords[,2], pch=19, col=cols,
-           xlab=paste0("Dim", dims[1], " (", round(perc[1],2), "%)"),
-           ylab=paste0("Dim", dims[2], " (", round(perc[2],2), "%)"),
-           main="Carte factorielle (modalités)")
-      text(coords[,1], coords[,2], labels=rownames(coords), pos=3, cex=.8,font=2)
+      plot(coords[,1], coords[,2], pch = 19, col = cols,
+           xlab = paste0("Dim", dims[1], " (", round(perc[1], 2), "%)"),
+           ylab = paste0("Dim", dims[2], " (", round(perc[2], 2), "%)"),
+           main = "Carte factorielle (modalités)")
 
-      abline(h=0,v=0,lty=3)
+      text(coords[,1], coords[,2],
+           labels = rownames(coords),
+           pos = 3, cex = 0.8, font = 2, col = cols)
+
+      abline(h = 0, v = 0, lty = 3)
+
+      # ✅ Ajout de la légende si les clusters sont définis
+      if (!is.null(kk) && !is.null(self$mod_clusters)) {
+        # Recalcule la même palette foncée pour la légende
+        dark_cols <- grDevices::colorRampPalette(c(
+          "#1f77b4","#ff7f0e","#2ca02c",
+          "#d62728","#9467bd","#8c564b",
+          "#e377c2","#7f7f7f","#bcbd22",
+          "#17becf"
+        ))(kk)
+
+        legend("topright",
+               legend = paste("Cluster", 1:kk),
+               col = dark_cols,
+               pch = 19,
+               pt.cex = 1.3,
+               bty = "n")
+      }
     },
 
     # =====================================================================
@@ -353,6 +378,7 @@ ClustModalities <- R6::R6Class(
         text(cors[,1], cors[,2], labels=rownames(cors), pos=3)
       }
 
+      rownames(cors) <- colnames(X_quant)
       return(as.data.frame(cors))
     },
 
@@ -362,6 +388,13 @@ ClustModalities <- R6::R6Class(
     illustrative = function(X_illust, plot = TRUE) {
       if (is.null(self$mod_clusters))
         stop("fit() avec k doit être exécuté avant illustrative().")
+
+      # 🚫 Filtrer toutes les variables numériques (elles n'ont rien à faire ici)
+      X_illust <- X_illust[, !sapply(X_illust, is.numeric), drop = FALSE]
+
+      if (ncol(X_illust) == 0) {
+        stop("Aucune variable qualitative illustrative. Les variables quantitatives doivent aller dans 'illustrative_numeric()'.")
+      }
 
       X_illust <- self$check_data(X_illust)
 
@@ -462,45 +495,78 @@ ClustModalities <- R6::R6Class(
 
       # Fonction de visualisation
       plot_func <- function() {
-        if (self$method == "acm" && !is.null(self$mod_coords)) {
-          # Carte factorielle avec modalités actives et illustratives
-          coords_active <- self$mod_coords[, 1:2]
-          cols_clusters <- rainbow(K)
 
-          # Points actifs : couleur = cluster
+        if (self$method == "acm" && !is.null(self$mod_coords)) {
+
+          coords_active <- self$mod_coords[, 1:2]
+
+          # Brush pour zoom
+          brush <- try(shiny::getDefaultReactiveDomain()$input$brush_acm_illu, silent = TRUE)
+
+          if (!inherits(brush, "try-error") && !is.null(brush)) {
+            xlim <- c(brush$xmin, brush$xmax)
+            ylim <- c(brush$ymin, brush$ymax)
+          } else {
+            xlim <- range(coords_active[, 1]) * 1.2
+            ylim <- range(coords_active[, 2]) * 1.2
+          }
+
+          # Couleurs clusters
+          dark_cols <- grDevices::colorRampPalette(c("#1f77b4","#ff7f0e","#2ca02c",
+                                                     "#d62728","#9467bd","#8c564b",
+                                                     "#e377c2","#7f7f7f","#bcbd22",
+                                                     "#17becf"))(K)
+
+          cols <- dark_cols[self$mod_clusters]
+
+          # --- PLOT des modalités ACTIVES ---
           plot(coords_active[, 1], coords_active[, 2],
-               pch = 19,
-               col = cols_clusters[self$mod_clusters],
+               pch = 19, col = cols,
+               cex = 1.3,
                xlab = "Dim 1", ylab = "Dim 2",
+               xlim = xlim, ylim = ylim,
                main = "Modalités actives et illustratives")
 
           text(coords_active[, 1], coords_active[, 2],
                labels = rownames(coords_active),
-               pos = 3, cex = 0.7,
-               col = cols_clusters[self$mod_clusters])
+               pos = 3, cex = 0.8, col = cols)
 
-          # Ajouter modalités illustratives, colorées selon cluster_assigned
+          # --- PLOT des modalités ILLUSTRATIVES ---
           if (exists("coords_illust")) {
-            cl_assigned <- result_table$cluster_assigned[
-              match(rownames(coords_illust), result_table$modality)
-            ]
-            cols_illust <- cols_clusters[cl_assigned]
 
+            # Récupérer les clusters assignés
+            cluster_assign <- result_table$cluster_assigned
+            dark_cols <- grDevices::colorRampPalette(c("#1f77b4","#ff7f0e","#2ca02c",
+                                                       "#d62728","#9467bd","#8c564b",
+                                                       "#e377c2","#7f7f7f","#bcbd22",
+                                                       "#17becf"))(K)
+            cols_illu <- dark_cols[cluster_assign]
+
+            # Étoiles
             points(coords_illust[, 1], coords_illust[, 2],
-                   pch = 17, col = cols_illust, cex = 1.5)
+                   pch = 8, col = cols_illu, cex = 1.8, lwd = 2)
+
+            # Labels
             text(coords_illust[, 1], coords_illust[, 2],
                  labels = rownames(coords_illust),
-                 pos = 3, cex = 0.8,
-                 col = cols_illust, font = 2)
+                 pos = 3, cex = 0.9, col = cols_illu, font = 2)
           }
 
-          abline(h = 0, v = 0, lty = 3)
+          abline(h = 0, v = 0, lty = 3, col = "grey70")
+
+          dark_cols <- grDevices::colorRampPalette(c(
+            "#1f77b4","#ff7f0e","#2ca02c",
+            "#d62728","#9467bd","#8c564b",
+            "#e377c2","#7f7f7f","#bcbd22",
+            "#17becf"
+          ))(K)
 
           legend("topright",
-                 legend = c(paste("Cluster", 1:K), "Illustrative"),
-                 col = c(cols_clusters, "black"),
-                 pch = c(rep(19, K), 17),
-                 cex = 0.8)
+                 legend = c(paste("Cluster", 1:K), "Illustratives"),
+                 col = c(dark_cols, "black"),
+                 pch = c(rep(19, K), 8),
+                 pt.cex = c(rep(1.5, K), 2),
+                 bty = "n")
         } else {
           # Pour DICE, barplot des distances (inchangé)
           par(mfrow = c(min(2, ceiling(nrow(result_table)/2)), 2))

@@ -54,9 +54,6 @@ kmeansUI <- function(id) {
               style = "background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
               h5("🎯 Correlation Circle", style = "color: #2d3748; font-weight: 600;"),
               plotOutput(ns("kmeans_corr_circle"), height = "400px"),
-              hr(),
-              h6("With Illustrative Variables", style = "color: #718096;"),
-              plotOutput(ns("kmeans_corr_circle_illust"), height = "400px")
             )
           ),
           column(
@@ -233,58 +230,82 @@ kmeansServer <- function(id, engine_reactive) {
       })
     })
 
-    # Projection des variables illustratives si présentes
+    # Projection des variables illustratives si présentes (VERSION D'ORIGINE STABLE)
+    # Projection des variables illustratives sur cercle de corrélation
     output$kmeans_corr_circle_illust <- renderPlot({
       req(kmeans_model())
+
       illust_data <- illustrative_data()
 
-      # On garde uniquement les illustratives numériques
-      if (!is.null(illust_data)) {
-        illust_data <- illust_data[, sapply(illust_data, is.numeric), drop = FALSE]
+      # Si rien du tout côté engine
+      if (is.null(illust_data)) {
+        plot.new()
+        text(0.5, 0.5, "No illustrative variables", cex = 1.2, col = "gray")
+        return(invisible(NULL))
       }
 
-      if (!is.null(illust_data) && ncol(illust_data) > 0) {
-        tryCatch({
-          centers <- kmeans_model()$centers
+      # On garde uniquement les colonnes numériques
+      illust_num <- illust_data[, sapply(illust_data, is.numeric), drop = FALSE]
 
-          if (is.null(centers) || ncol(centers) < 2) {
-            stop("At least 2 clusters are required to draw a correlation circle.")
-          }
-
-          # On prend les deux premières composantes latentes (PC1 des 2 premiers clusters)
-          scores <- centers[, 1:2, drop = FALSE]
-
-          # Corrélations des illustratives avec les deux composantes latentes
-          cor_illust <- stats::cor(illust_data, scores, use = "pairwise.complete.obs")
-
-          x <- cor_illust[, 1]
-          y <- cor_illust[, 2]
-          lab <- rownames(cor_illust)
-
-          # Cercle unité
-          theta <- seq(0, 2 * pi, length.out = 200)
-          circle_x <- cos(theta)
-          circle_y <- sin(theta)
-
-          plot(circle_x, circle_y, type = "l",
-               xlim = c(-1.1, 1.1), ylim = c(-1.1, 1.1),
-               asp = 1,
-               xlab = "Latent component 1",
-               ylab = "Latent component 2",
-               main = "Illustrative variables on latent components")
-          abline(h = 0, v = 0, lty = 3, col = "grey70")
-
-          points(x, y, pch = 17, col = "red", cex = 1.3)
-          text(x, y, labels = lab, pos = 3, cex = 0.8, col = "red")
-
-        }, error = function(e) {
-          plot.new()
-          text(0.5, 0.5, paste("Error:", e$message), cex = 1.2, col = "red")
-        })
-      } else {
+      if (is.null(illust_num) || ncol(illust_num) == 0) {
         plot.new()
         text(0.5, 0.5, "No numeric illustrative variables", cex = 1.2, col = "gray")
+        return(invisible(NULL))
       }
+
+      # Centres du modèle K-means
+      centers <- kmeans_model()$centers
+
+      if (is.null(centers) || ncol(centers) < 2) {
+        plot.new()
+        text(0.5, 0.5,
+             "At least 2 clusters are required to draw a correlation circle",
+             cex = 1.0, col = "gray")
+        return(invisible(NULL))
+      }
+
+      # On force bien en matrices numériques
+      centers_mat <- as.matrix(centers)
+      mode(centers_mat) <- "numeric"
+
+      illust_mat <- as.matrix(illust_num)
+      mode(illust_mat) <- "numeric"
+
+      # On prend les deux premières composantes (colonnes) des centres
+      scores <- centers_mat[, 1:2, drop = FALSE]
+
+      # Corrélation illustratives × composantes latentes
+      cor_illust <- stats::cor(illust_mat, scores, use = "pairwise.complete.obs")
+
+      # Si une seule variable illustrative → cor() renvoie un vecteur => on remet en matrice
+      if (is.null(dim(cor_illust))) {
+        cor_illust <- matrix(cor_illust, ncol = 2, byrow = TRUE)
+        rownames(cor_illust) <- colnames(illust_mat)
+        colnames(cor_illust) <- c("Comp1", "Comp2")
+      }
+
+      x <- cor_illust[, 1]
+      y <- cor_illust[, 2]
+      lab <- rownames(cor_illust)
+
+      # Cercle unité
+      theta <- seq(0, 2 * pi, length.out = 200)
+      circle_x <- cos(theta)
+      circle_y <- sin(theta)
+
+      plot(circle_x, circle_y, type = "l",
+           xlim = c(-1.1, 1.1), ylim = c(-1.1, 1.1),
+           asp = 1,
+           xlab = "Latent component 1",
+           ylab = "Latent component 2",
+           main = "Illustrative variables on latent components")
+
+      abline(h = 0, v = 0, lty = 3, col = "grey70")
+
+      # Flèches + étoiles pour les illustratives
+      arrows(0, 0, x, y, length = 0.08, col = "red", lwd = 1.5)
+      points(x, y, pch = 8, col = "red", cex = 1.3)
+      text(x * 1.05, y * 1.05, labels = lab, pos = 3, cex = 0.8, col = "red")
     })
 
     # ========== OUTPUT: BIPLOT ==========
@@ -402,7 +423,15 @@ kmeansServer <- function(id, engine_reactive) {
                 style = "background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
                 h5("📊 Illustrative Variables - R² with Clusters", style = "color: #2d3748; font-weight: 600;"),
                 DTOutput(ns("illustrative_table"))
-              )
+              ),
+              div(
+                style = "background: white; padding: 15px; border-radius: 8px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
+                h5("📈 Correlation Circle of Numeric Illustrative Variables",
+                   style = "color: #2d3748; font-weight: 600;"),
+                plotOutput(ns("kmeans_corr_circle_illust"), height = "400px")
+              ),
+              br(),
             )
           ),
 

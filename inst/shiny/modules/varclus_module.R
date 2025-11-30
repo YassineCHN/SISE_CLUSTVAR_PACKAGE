@@ -244,24 +244,35 @@ varclus_server <- function(engine_reactive, input = NULL, output = NULL, session
   # ========== OUTPUT: HEATMAP ==========
   output$varclus_heatmap <- renderPlot({
     req(varclus_model())
-    tryCatch({
-      cor_mat <- varclus_model()$model$sim
-      if (is.null(cor_mat)) {
-        stop("Similarity matrix not found in VarClus model.")
-      }
-      if (!is.matrix(cor_mat)) {
-        cor_mat <- as.matrix(cor_mat)
-      }
 
-      n <- nrow(cor_mat)
-      heatmap(cor_mat,
-              col = colorRampPalette(c("blue", "white", "red"))(100),
-              scale = "none",
-              main = "Correlation Heatmap",
-              margins = c(10, 10))
+    tryCatch({
+
+      X <- varclus_model()$data
+      cor_mat <- cor(X)
+
+      # Ordre basé sur le clustering hclust déjà calculé
+      hc <- varclus_model()$model$hclust
+      ord <- hc$order
+      cor_ord <- cor_mat[ord, ord]
+
+      # Palette moderne
+      colfun <- colorRampPalette(c("#2166AC", "#F7F7F7", "#B2182B"))
+
+      corrplot::corrplot(
+        cor_ord,
+        method = "color",
+        col = colfun(200),
+        order = "original",
+        tl.col = "black",
+        tl.cex = 0.8,
+        tl.srt = 45,
+        addCoef.col = NA,   # ❗ retire les nombres sur la heatmap
+        diag = FALSE
+      )
+
     }, error = function(e) {
       plot.new()
-      text(0.5, 0.5, paste("Error:", e$message), cex = 1.2, col = "red")
+      text(0.5, 0.5, paste("Error:", e$message), col = "red")
     })
   })
 
