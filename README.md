@@ -15,13 +15,13 @@
 - [📦 Installation](#-installation)
 - [🚀 Quick Start Guide](#-quick-start-guide)
   - [K-Means for Quantitative Variables](#1-k-means-for-quantitative-variables)
-  - [HAC for Qualitative Variables](#2-hac-for-qualitative-variables)
-  - [VarClus for Quantitative Variables](#3-varclus-for-quantitative-variables)
-- [📊Datasets included](#-datasets-included)
+  - [HAC for Qualitative Variables](#-2-mca-hac-for-qualitative-variables)
+  - [VarClus for Quantitative Variables](#-3-varclus-for-hierarchical-clustering)
+- [📊Datasets included](#-included-datasets)
 - [🔧Advanced Features](#-advanced-features)
 - [🎨 Shiny Application](#-shiny-application)
 - [🧪Tests](#-tests)
-- [📂 Package structure](#️-package-structure)
+- [📂 Package structure](#-package-structure)
 - [❓ Getting Help](#-getting-help)
 - [👥 Authors](#-authors)
 - [📄 License](#-license)
@@ -86,7 +86,7 @@ The package requires:
 
 ---
 
-## 🚀 Quick Start Quide
+## 🚀 Quick Start Guide
 
 ### 🔄1. K-Means for Quantitative Variables
 
@@ -629,24 +629,6 @@ testthat::test_file("tests/testthat/test-varclus.R")
 
 ---
 
-## ❓ Getting Help
-
-### Function help 
-
-```r
-# Help for a class 
-?KMeansVariablesQuant
-?ClustModalities
-?VarClus
-
-# Help for a dataset
-?crime
-?vote
-?uscrime
-```
-
----
-
 ## 📂 Package structure 
 
 
@@ -680,6 +662,24 @@ ClusteringVariables/
 ├── NAMESPACE                   # Exports (auto-generated)
 ├── LICENSE                     # MIT License
 └── README.md                   # This file
+```
+
+---
+
+## ❓ Getting Help
+
+### Function help 
+
+```r
+# Help for a class 
+?KMeansVariablesQuant
+?ClustModalities
+?VarClus
+
+# Help for a dataset
+?crime
+?vote
+?uscrime
 ```
 
 ---
