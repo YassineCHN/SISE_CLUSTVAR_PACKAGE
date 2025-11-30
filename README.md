@@ -1,6 +1,6 @@
 # 📊 ClusteringVariables: R Package for Variable Clustering & Analysis
 
-> **This project is conducted as part of the Data Science curriculum at the University of Lyon 2, Master 2 SISE. Its main objective is to develop an R package and a Shiny application capable of performing variable clustering on any given dataset. Users can install the R package directly from GitHub or access the Shiny application to explore and test the package's functionalities.
+> This project is conducted as part of the Data Science curriculum at the University of Lyon 2, Master 2 SISE. Its main objective is to develop an R package and a Shiny application capable of performing variable clustering on any given dataset. Users can install the R package directly from GitHub or access the Shiny application to explore and test the package's functionalities.
 
 
 [![R Version](https://img.shields.io/badge/R-%E2%89%A5%204.0.0-blue)](https://www.r-project.org/)
@@ -18,10 +18,10 @@
   - [HAC for Qualitative Variables](#2-hac-for-qualitative-variables)
   - [VarClus for Quantitative Variables](#3-varclus-for-quantitative-variables)
 - [📊Datasets included](#-datasets-included)
-- [🔧Fonctionnalités avancées](#-fonctionnalités-avancées)
-- [🎨 Shiny Application](#-)
+- [🔧Advanced Features](#-advanced-features)
+- [🎨 Shiny Application](#-shiny-application)
 - [🧪Tests](#-tests)
-- [🛠️ Package structure](#-contributions)
+- [🛠️ Package structure](#️-package-structure)
 - [❓ Getting Help](#-getting-help)
 - [👥 Authors](#-authors)
 - [📄 License](#-license)
@@ -52,52 +52,52 @@ Therefore, we developed the `ClusteringVariables` package. It is an R package bu
 ### From GitHub
 
 ```r
-# Installation de devtools si nécessaire
+# Install devtools if needed
 if (!require("devtools")) install.packages("devtools")
 
-# Installation du package
+# Install the package
 devtools::install_github("maissaladjimi/SISE_Clustering_Variables_R", ref = "test_module")
 ```
 
-### Installation locale
+### Local installation
 
 ```r
-# Depuis le répertoire du package
+# From the package directory
 devtools::install()
 ```
 
-### Dépendances
+### Dependencies
 
-Le package nécessite :
+The package requires:
 - `R6`, `Hmisc`, `ade4`, `dendextend`, `plotly`, `shiny`
-- Pour les applications Shiny : `shinyjs`, `shinythemes`
+- For shiny applications: `shinyjs`, `shinythemes`
 
 ---
 
 ## 🎯 Algorithms
 
-**ClusteringVariables** propose trois approches complémentaires pour le clustering de variables :
+**ClusteringVariables** offers three complementary approaches for variable clustering :
 
-| Méthode | Type de variables | Principe | Usage |
+| Method | Variable Type | Principle | Use |
 |---------|------------------|----------|-------|
-| **K-Means Variables** | Quantitatives | Partitionnement par centres mobiles | Groupes de variables corrélées |
-| **ACM-CAH** | Qualitatives | ACM + Classification hiérarchique | Modalités similaires |
-| **VarClus** | Quantitatives | Hiérarchique basé sur corrélations | Structure arborescente |
+| **K-Means Variables** | Quantitative | Partitioning based on moving centroids | Groups of correlated variables |
+| **MCA-HAC** | Qualitative | MCA + Hierarchical clustering | Similar modalities |
+| **VarClus** | Quantitative | Hierarchical based on correlations | Tree-like structure |
 
 ---
 
-## 🚀 Guide de démarrage rapide
+## 🚀 Quick Start Quide
 
-### 🔄1. K-Means pour variables quantitatives
+### 🔄1. K-Means for Quantitative Variables
 
-**Objectif** : Regrouper des variables numériques fortement corrélées.
+**Objective** : Group numerical variables that are highly correlated.
 
-#### Exemple complet avec le dataset `crime`
+#### Complete example with the `crime` dataset
 
 ```r
 library(ClusteringVariables)
 
-# Chargement des données
+# loading data
 data(crime)
 head(crime, 3)
 #   CrimeRate Male14-24 Southern Education Expend60 Expend59 Labor ...
@@ -107,24 +107,24 @@ head(crime, 3)
 
 # Dimensions
 dim(crime)
-# [1] 47 14  # 47 États × 14 variables socio-économiques
+# [1] 47 14  # 47 États × 14 socio-economic variables
 ```
 
-#### Clustering avec K-Means
+#### Clustering with K-Means
 
-**Note** : On exclut `CrimeRate` du clustering pour l'utiliser comme variable illustrative.
+**Note** : `CrimeRate` is excluded from clustering to use as an illustrative variable.
 
 ```r
-# Séparer CrimeRate du reste
-crime_vars <- crime[, -1]  # Toutes sauf CrimeRate
+# Separate CrimeRate from the rest of the dataset
+crime_vars <- crime[, -1]  # All except CrimeRate
 
-# Initialisation avec 4 clusters (optimal d'après l'elbow)
+# Initialize with 4 clusters (optimal according to elbow method)
 km <- KMeansVariablesQuant$new(k = 4, n_init = 20, seed = 42)
 
-# Ajustement du modèle
+# Fit the model
 km$fit(crime_vars)
 
-# Résumé des résultats
+# Summary of results
 km$summary()
 # ========================================
 #   K-MEANS CLUSTERING OF VARIABLES
@@ -135,41 +135,41 @@ km$summary()
 # ...
 ```
 
-## Interprétation
+## Interpretation
 
-Les résultats montrent 4 clusters de variables :
+The results show 4 clusters of variables :
 
-- **Cluster 1** : Variables de dépenses (Expend60, Expend59)
-- **Cluster 2** : Variables socio-démographiques (Education, Southern, Male14-24, etc.)
-- **Cluster 3** : Variables économiques/emploi
-- **Cluster 4** : Variables de population
+- **Cluster 1** : Expenditure variables (Expend60, Expend59)
+- **Cluster 2** : Socio-demographic variables (Education, Southern, Male14-24, etc.)
+- **Cluster 3** : Economic/employment variables
+- **Cluster 4** : Population variables
 
-Chaque cluster regroupe des variables fortement corrélées entre elles.
+Each cluster groups variables that are highly correlated with each other.
 
-#### Visualisations
+#### Visualizations
 
 ```r
-# Cercle de corrélation
+# Correlation circle
 km$plot_correlation_circle()
 
-# Biplot des variables
+# Biplot of variables
 km$plot_biplot()
 
-# Méthode du coude pour choisir k
+# Elbow method to choose k
 km$plot_elbow(k_range = 2:6)
 # === K-Means Elbow Analysis ===
 # Optimal k: 4
 ```
 
-#### Prédiction sur nouvelles variables
+#### Prediction on New Variables
 
 ```r
-# Prédire le cluster d'une nouvelle variable corrélée au crime
+# Predict the cluster of a new variable correlated with crime
 new_var <- data.frame(
   Unemployment = rnorm(nrow(crime), mean = 6, sd = 2)
 )
 
-# Prédiction
+# Prediction
 predictions <- km$predict(new_var)
 # Warning: 1 variable(s) have R² < 30%: Unemployment
 # These variables are poorly represented by existing clusters.
@@ -180,10 +180,10 @@ print(predictions)
 
 ```
 
-#### Variables illustratives
+#### Illustrative Variables
 
 ```r
-# Utiliser CrimeRate comme variable illustrative
+# Use CrimeRate as an illustrative variable
 crime_rate_df <- data.frame(CrimeRate = crime$CrimeRate)
 
 result <- km$illustrative(crime_rate_df, plot = TRUE)
@@ -191,19 +191,19 @@ print(result$table)
 #           variable cluster r2_max distance
 # CrimeRate CrimeRate       4  42.28   0.7597
 
-# Interprétation : 
-# - CrimeRate est le mieux représenté par le Cluster 4 (R² = 42.28%)
-# - distance = 0.76 indique une corrélation modérée avec ce cluster
-# - Le Cluster 4 contient probablement des variables socio-économiques liées au crime
+# Interpretation : 
+# - CrimeRate is best represented by Cluster 4 (R² = 42.28%)
+# - distance = 0.76 indicates a moderate correlation with this cluster
+# - Cluster 4 likely contains socio-economic variables related to crime
 ```
 
 ---
 
-### 🔗 2. ACM-CAH pour variables qualitatives
+### 🔗 2. MCA-HAC for Qualitative Variables
 
-**Objectif** : Regrouper des modalités de variables qualitatives.
+**Objective** : Group modalities of qualitative variables.
 
-#### Exemple avec le dataset `vote`
+#### Example with the `vote` dataset
 
 ```r
 data(vote)
@@ -220,19 +220,19 @@ str(vote)
 #  $ budget     : Factor w/ 3 levels "n","neither","y": 1 1 3 ...
 ```
 
-#### Clustering avec ACM
+#### Clustering with MCA
 
-**Note** : On exclut la variable `affiliation` (parti politique) pour l'utiliser comme variable illustrative et pour les prédictions.
+**Note** : The variable `affiliation` (political party) is excluded to use as an illustrative variable and for predictions.
 
 ```r
-# Séparer affiliation du reste
-vote_vars <- vote[, -1]  # Toutes les variables sauf affiliation
+# Separate affiliation from the rest
+vote_vars <- vote[, -1]  # All variables except affiliation
 
-# Méthode ACM (Analyse des Correspondances Multiples)
+# MCA method (Multiple Correspondence Analysis)
 cm <- ClustModalities$new(method = "acm", n_axes = 5)
 cm$fit(vote_vars, k = 3)
 
-# Résumé
+# Summary
 cm$summary()
 # ========================================
 # CLUSTERING OF QUALITATIVE MODALITIES
@@ -253,28 +253,28 @@ cm$summary()
 # - Cluster 3                 : 6 modalities
 ```
 
-#### Visualisations ACM
+#### MCA Visualizations
 
 ```r
 # Dendrogramme
 cm$plot_dendrogram(k = 3)
 
-# Plan factoriel
+# Factorial map
 cm$plot_factorial_map(dims = c(1, 2))
 
-# Éboulis des valeurs propres
+# Scree plot
 cm$plot_scree()
 
-# Contribution des modalités
+# Contribution of modalities
 cm$plot_contrib(dim = 1, top = 10)
 ```
 
-#### Méthode DICE (alternative)
+#### DICE Method (Alternative)
 
-La méthode DICE utilise l'indice de similarité de Dice au lieu de l'ACM :
+The DICE method uses the Dice similarity index instead of MCA :
 
 ```r
-# Clustering basé sur l'indice de DICE
+# Clustering based on the Dice index
 cm_dice <- ClustModalities$new(method = "dice")
 cm_dice$fit(vote_vars, k = 3)
 
@@ -289,16 +289,16 @@ cm_dice$summary()
 # Dendrogramme
 cm_dice$plot_dendrogram(k = 3)
 
-# Comparaison des deux méthodes
-cat("\n=== Comparaison ACM vs DICE ===\n")
-print("ACM : Basé sur l'analyse factorielle des correspondances")
-print("DICE : Basé sur l'indice de similarité (simple, intuitif)")
+# Comparison of the two methods
+cat("\n=== Comparison MCA vs DICE ===\n")
+print("MCA: Based on Multiple Correspondence Analysis")
+print("DICE: Based on similarity index (simple, intuitive)")
 ```
 
-#### Prédiction sur nouvelles observations
+#### Prediction on New Variables
 
 ```r
-# Exemple : utiliser 'affiliation' (parti politique) comme nouvelle variable
+# Example: using 'affiliation' (political party) as a new variable
 affiliation_df <- data.frame(affiliation = vote$affiliation)
 
 predictions <- cm$predict(affiliation_df)
@@ -308,31 +308,31 @@ print(predictions)
 # affiliation.democrat     affiliation.democrat       3 0.19380920
 ```
 
-**Note** : La méthode predict() de ACM-CAH nécessite le même nombre d'observations que l'apprentissage. Voir la documentation pour plus de détails.
+**Note** : the predict() method of MCA-HAC requires the same number of observations as the training data. See the documentation for details.
 
-#### Variables illustratives
+#### Illustrative Variables
 
-**Variable qualitative** : Utiliser `affiliation` (parti politique) comme illustrative
+**Qualitative variable** : Use `affiliation` (political party) as illustrative
 
 ```r
-# Affiliation comme variable illustrative (version détaillée)
+# Affiliation as an illustrative variable (detailed version)
 affiliation_df <- data.frame(affiliation = vote$affiliation)
 result_parti <- cm$illustrative(affiliation_df, plot = TRUE)
 print(result_parti$table)
 
-# Interprétation :
-# - Les modalités "democrat" et "republican" sont projetées sur les clusters
-# - On voit quel cluster est le plus associé à chaque parti
-# - Cela illustre les profils de vote selon l'affiliation politique
+# Interpretation :
+# - The modalities "democrat" and "republican" are projected onto the clusters
+# - We can see which cluster is most associated with each party
+# - This illustrates voting profiles according to political affiliation
 ```
 
 ---
 
-### 🌳 3. VarClus pour clustering hiérarchique
+### 🌳 3. VarClus for Hierarchical Clustering
 
-**Objectif** : Clustering hiérarchique de variables avec mesures de similarité.
+**Objective** : Hierarchical clustering of variables using similarity measures.
 
-#### Exemple avec le dataset `uscrime`
+#### Exemple with the `uscrime` dataset
 
 ```r
 data(uscrime)
@@ -346,16 +346,16 @@ dim(uscrime)
 # [1] 47 16  # 47 États × 16 variables socio-économiques
 ```
 
-#### Clustering avec VarClus
+#### Clustering with VarClus
 
 ```r
-# Initialisation (similarité Pearson par défaut)
+# Initialization (Pearson similarity by default)
 vc <- VarClus$new(similarity = "pearson", n_clusters = 4)
 
-# Ajustement
+# Fit the model
 vc$fit(uscrime)
 
-# Résumé détaillé
+# Detailed summary
 vc$summary()
 # ========================================
 # VARCLUS - VARIABLE CLUSTERING
@@ -375,22 +375,22 @@ vc$summary()
 # - Cluster 4                 : 2 variables
 ```
 
-#### Visualisations
+#### Visualizations
 
 ```r
-# Dendrogramme hiérarchique
+# Hierarchical dendrogram
 dend_func <- vc$get_dendrogram()
 dend_func()
 
-# Heatmap de similarité
+# Similarity heatmap
 heatmap_func <- vc$get_heatmap()
 heatmap_func()
 ```
 
-#### Prédiction
+#### Prediction
 
 ```r
-# Prédire le cluster d'une nouvelle variable
+# Predict the cluster of a new variable
 new_var <- rnorm(nrow(uscrime))
 prediction <- vc$predict(new_var)
 
@@ -409,7 +409,7 @@ print(prediction)
 # ...
 ```
 
-#### Variables illustratives
+#### Illustrative Variables
 
 ```r
 illust_vars <- data.frame(
@@ -421,18 +421,18 @@ result <- vc$illustrative(illust_vars)
 print(result$table)
 ```
 
-#### Changer le nombre de clusters
+#### Changing the Number of Clusters
 
 ```r
-# Re-découper avec un nombre différent de clusters
+# Re-cluster with a different number of clusters
 vc$n_clusters <- 5
 vc$fit(uscrime)
 
 vc$summary()
-# Nombre de clusters: 5
+# Number of clusters: 5
 ```
 
-#### Utiliser Spearman au lieu de Pearson
+#### Using Spearman Instead of Pearson
 
 ```r
 vc_spearman <- VarClus$new(similarity = "spearman", n_clusters = 4)
@@ -441,54 +441,54 @@ vc_spearman$fit(uscrime)
 
 ---
 
-## 📊 Datasets inclus
+## 📊 Included Datasets
 
-Le package inclut 6 datasets prêts à l'emploi :
+The package includes 6 ready-to-use datasets:
 
 | Dataset | Dimensions | Type | Description |
 |---------|-----------|------|-------------|
-| **crime** | 47 × 14 | Quantitatif | Statistiques de criminalité par État US |
-| **uscrime** | 47 × 16 | Quantitatif | Variables socio-économiques et criminalité |
-| **autos** | 18 × 9 | Mixte | Caractéristiques de véhicules (7 num, 2 cat) |
-| **autos2005** | 38 × 13 | Mixte | Véhicules 2005 (9 num, 4 cat) |
-| **loisirs** | 8403 × 23 | Qualitatif | Enquête pratiques de loisirs (1 num, 22 cat) |
-| **vote** | 435 × 7 | Qualitatif | Votes du Congrès US 1984 |
+| **crime** | 47 × 14 | Quantitative | US state crime statistics |
+| **uscrime** | 47 × 16 | Quantitative | Socio-economic variables and crime |
+| **autos** | 18 × 9 | Mixed | Vehicle characteristics (7 num, 2 cat) |
+| **autos2005** | 38 × 13 | Mixed | Vehicles 2005 (9 num, 4 cat) |
+| **loisirs** | 8403 × 23 | Qualitative | Leisure activity survey (1 num, 22 cat) |
+| **vote** | 435 × 7 | Qualitative | 1984 US Congressional votes |
 
-**Accès aux datasets** :
+**Accessing the datasets:** :
 
 ```r
-# Lister tous les datasets
+# List all datasets
 data(package = "ClusteringVariables")
 
-# Charger un dataset
+# Load a dataset
 data(crime)
-?crime  # Voir la documentation
+?crime  # View documentation
 ```
 
 ---
 
-## 🔧 Fonctionnalités avancées
+## 🔧 Advanced Features
 
-### Méthode du coude automatique
+### Automatic Elbow Method
 
-Les algorithmes proposent une détection automatique du nombre optimal de clusters (la proposition de k optimal peut être fausse, le plus fiable est de référer à l'elbow plot pour choisir k) :
+The algorithms provide automatic detection of the optimal number of clusters (the suggested k may be inaccurate; it is recommended to refer to the elbow plot to choose k):
 
 ```r
 # K-Means
 data(crime)
-crime_vars <- crime[, -1]  # Exclure CrimeRate
+crime_vars <- crime[, -1]  # Exclude CrimeRate
 
 km <- KMeansVariablesQuant$new(k = 4)
 km$fit(crime_vars)
 elbow_result <- km$plot_elbow(k_range = 2:8)
-print(elbow_result$optimal_k)  # k optimal suggéré : 4
+print(elbow_result$optimal_k)  # Suggested optimal k: 4
 
 ```
 
-### Récupérer les clusters
+### Retrieving Clusters
 
 ```r
-# K-Means et VarClus
+# K-Means & VarClus
 clusters_table <- km$get_clusters_table()
 print(clusters_table)
 #       variable cluster
@@ -501,21 +501,21 @@ print(clusters_table)
 # 8      PopSize       3
 # 3    Education       4
 
-# ACM-CAH
+# MCA-HAC
 clusters_table <- cm$get_clusters_table()  
 ```
 
-### Qualité du clustering
+### Clustering Quality
 
-#### K-Means : Inertie et R²
+#### K-Means : Inertia and R²
 
 ```r
 results <- km$summary(print_output = FALSE)
 
-# Inertie totale
+# Total inertia
 print(results$global_quality)
 
-# R² par variable
+# R² per variable
 print(results$cluster)
 #   Cluster Size Inertia Avg_R2.Var1 Avg_R2.Freq  
 #1       1    2  1.7459           1      0.8730   
@@ -524,23 +524,23 @@ print(results$cluster)
 #4       4    6  4.4051           4      0.7342   
 # ...
 
-# Corrélation entre composantes latentes
+# Correlation between latent components
 print(results$cor_latent)
 ```
 
-#### VarClus : R² et PCA
+#### VarClus : R² and PCA
 
 ```r
 results <- vc$summary(print_output = FALSE)
 
-# Qualité par cluster
+# Cluster quality
 print(results$cluster_quality)
 #   cluster mean_R2_own
 # 1       1      0.8234
 # 2       2      0.7891
 # ...
 
-# Détails R² par variable
+# R² details per variable
 print(results$R2_details)
 ```
 ---
@@ -550,21 +550,21 @@ content shiny
 ---
 ## 🧪 Tests
 
-Le package inclut **203 tests unitaires** couvrant toutes les fonctionnalités.
+The package includes **203 unit tests** covering all functionalities.
 
-### Exécuter les tests
+### Running the Tests
 
 ```r
-# Tous les tests
+# Run all tests
 devtools::test()
 
-# Tests spécifiques
+# Run specific tests
 testthat::test_file("tests/testthat/test-kmeans.R")
 testthat::test_file("tests/testthat/test-acm_cah.R")
 testthat::test_file("tests/testthat/test-varclus.R")
 ```
 
-### Résultats attendus
+### Expected Results
 
 ```
 ✔ | 68 | acm_cah
