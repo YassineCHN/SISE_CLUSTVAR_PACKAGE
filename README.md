@@ -595,9 +595,7 @@ Hierarchical divisive clustering for quantitative variables with dendrograms, he
 
 Watch a complete demonstration of the application:
 
-**[📺 Application Demo Video](YOUR_VIDEO_LINK_HERE)**
-
-*(Video coming soon)*
+**[📺 Application Demo Video](https://youtu.be/4LUbIMIcrc8)**
 
  
 ---
