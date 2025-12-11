@@ -56,7 +56,7 @@ Therefore, we developed the `ClusteringVariables` package. It is an R package bu
 if (!require("devtools")) install.packages("devtools")
 
 # Install the package
-devtools::install_github("maissaladjimi/SISE_Clustering_Variables_R")
+devtools::install_github("YassineCHN/SISE_CLUSTVAR_PACKAGE")
 ```
 
 ### Local installation
